@@ -37,7 +37,8 @@ func (s *Server) securityHeaders(next http.Handler) http.Handler {
 	const csp = "default-src 'self'; " +
 		"script-src 'self'; " +
 		"style-src 'self'; " +
-		"img-src 'self' data:; " +
+		"img-src 'self'; " +
+		"object-src 'none'; " +
 		"form-action 'self'; " +
 		"frame-ancestors 'none'; " +
 		"base-uri 'self'"

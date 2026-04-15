@@ -69,6 +69,17 @@ func (s *SessionStore) Delete(token string) error {
 	return err
 }
 
+// DeleteOthers invalidates every session for userID except keepToken. Used
+// to rotate sessions on login so a successful auth logs the user out of
+// any other devices or browsers that had a prior session.
+func (s *SessionStore) DeleteOthers(userID int64, keepToken string) error {
+	_, err := s.db.Exec(
+		`DELETE FROM sessions WHERE user_id = ? AND token != ?`,
+		userID, keepToken,
+	)
+	return err
+}
+
 func (s *SessionStore) PurgeLoop(ctx context.Context, every time.Duration) {
 	t := time.NewTicker(every)
 	defer t.Stop()

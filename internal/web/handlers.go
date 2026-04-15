@@ -28,11 +28,14 @@ const (
 	maxTagsLen         = 512
 )
 
+// truncate caps s at max bytes. If the cut lands mid-rune the trailing
+// invalid bytes are dropped via strings.ToValidUTF8 so the result is
+// always a valid UTF-8 string.
 func truncate(s string, max int) string {
-	if len(s) > max {
-		return s[:max]
+	if len(s) <= max {
+		return s
 	}
-	return s
+	return strings.ToValidUTF8(s[:max], "")
 }
 
 // clientIP returns the request's client IP, honoring X-Forwarded-For only
@@ -179,14 +182,18 @@ func (s *Server) getSetup(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
+	// Hold setupMu across the entire check → compare → insert → clear
+	// so that two concurrent requests with the correct token can't both
+	// see users=0 and end up creating two admin rows.
+	s.setupMu.Lock()
+	defer s.setupMu.Unlock()
+
 	if n, _ := s.userCount(); n > 0 {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	s.setupMu.Lock()
 	expected := s.setupToken
-	s.setupMu.Unlock()
 	submitted := r.FormValue("setup_token")
 	if expected == "" || subtle.ConstantTimeCompare([]byte(submitted), []byte(expected)) != 1 {
 		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "invalid setup token — check the server logs or restart with -setup-token"})
@@ -212,12 +219,8 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// One-time token — burn it after a successful admin creation.
-	s.setupMu.Lock()
 	s.setupToken = ""
-	s.setupMu.Unlock()
 	s.logger.Info("first-run setup completed; setup token consumed")
-
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -263,6 +266,11 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "session error", http.StatusInternalServerError)
 		return
+	}
+	// Rotate: invalidate every other session for this user so a fresh
+	// login logs them out of other browsers/devices.
+	if err := s.sessions.DeleteOthers(id, sess.Token); err != nil {
+		s.logger.Warn("session rotation", "user_id", id, "err", err)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     auth.SessionCookieName,
