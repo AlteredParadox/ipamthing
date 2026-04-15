@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"flag"
@@ -19,10 +20,37 @@ import (
 	"ipamthing/internal/web"
 )
 
+func purgeEvents(ctx context.Context, database *sql.DB, retention time.Duration, logger *slog.Logger) {
+	run := func() {
+		cutoff := time.Now().Add(-retention).Unix()
+		res, err := database.ExecContext(ctx, `DELETE FROM scan_events WHERE ts < ?`, cutoff)
+		if err != nil {
+			logger.Error("scan_events purge", "err", err)
+			return
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			logger.Info("scan_events purged", "deleted", n, "retention", retention)
+		}
+	}
+	run()
+	t := time.NewTicker(24 * time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			run()
+		}
+	}
+}
+
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "ipamthing.db", "SQLite database file path")
 	setupTokenFlag := flag.String("setup-token", "", "one-time token required for first-run /setup (random + logged if empty and no users exist)")
+	trustProxy := flag.Bool("trust-proxy", false, "honor X-Forwarded-Proto / X-Forwarded-For from a reverse proxy")
+	retentionDays := flag.Int("event-retention-days", 90, "purge scan events older than N days (0 = keep forever)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -39,6 +67,14 @@ func main() {
 
 	sessions := auth.NewSessionStore(database)
 	go sessions.PurgeLoop(ctx, time.Hour)
+
+	loginLimiter := auth.NewLoginLimiter(10, 15*time.Minute, 15*time.Minute)
+	go loginLimiter.PurgeLoop(ctx, 5*time.Minute)
+
+	if *retentionDays > 0 {
+		retention := time.Duration(*retentionDays) * 24 * time.Hour
+		go purgeEvents(ctx, database, retention, logger)
+	}
 
 	scanner := scan.NewScanner(logger)
 	scheduler := scan.NewScheduler(database, scanner, logger)
@@ -67,7 +103,7 @@ func main() {
 		}
 	}
 
-	handler := web.NewRouter(logger, database, sessions, scanner, scheduler, setupToken)
+	handler := web.NewRouter(logger, database, sessions, loginLimiter, scanner, scheduler, setupToken, *trustProxy)
 
 	srv := &http.Server{
 		Addr:              *addr,

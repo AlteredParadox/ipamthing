@@ -23,12 +23,14 @@ var templatesFS embed.FS
 var staticFS embed.FS
 
 type Server struct {
-	logger    *slog.Logger
-	db        *sql.DB
-	sessions  *auth.SessionStore
-	scanner   *scan.Scanner
-	scheduler *scan.Scheduler
-	tmpls     map[string]*template.Template
+	logger       *slog.Logger
+	db           *sql.DB
+	sessions     *auth.SessionStore
+	loginLimiter *auth.LoginLimiter
+	scanner      *scan.Scanner
+	scheduler    *scan.Scheduler
+	tmpls        map[string]*template.Template
+	trustProxy   bool
 
 	setupMu    sync.Mutex
 	setupToken string // required for /setup; cleared after first admin is created
@@ -58,7 +60,7 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, scanner *scan.Scanner, scheduler *scan.Scheduler, setupToken string) http.Handler {
+func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, loginLimiter *auth.LoginLimiter, scanner *scan.Scanner, scheduler *scan.Scheduler, setupToken string, trustProxy bool) http.Handler {
 	pages := []string{"setup", "login", "subnets", "hosts", "host", "events", "dashboard", "settings"}
 	tmpls := make(map[string]*template.Template, len(pages))
 	for _, p := range pages {
@@ -72,9 +74,9 @@ func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, sca
 	}
 
 	s := &Server{
-		logger: logger, db: db, sessions: sessions,
+		logger: logger, db: db, sessions: sessions, loginLimiter: loginLimiter,
 		scanner: scanner, scheduler: scheduler, tmpls: tmpls,
-		setupToken: setupToken,
+		setupToken: setupToken, trustProxy: trustProxy,
 	}
 
 	mux := http.NewServeMux()
@@ -109,5 +111,5 @@ func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, sca
 	mux.Handle("GET /settings", s.auth(http.HandlerFunc(s.getSettings)))
 	mux.Handle("POST /settings", s.auth(http.HandlerFunc(s.postSettings)))
 
-	return s.firstRun(mux)
+	return s.csrf(s.firstRun(mux))
 }

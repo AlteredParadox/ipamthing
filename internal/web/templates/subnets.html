@@ -1,6 +1,7 @@
 {{define "content"}}
 <h1>Subnets</h1>
 <form method="post" action="/subnets" class="inline-form">
+{{template "csrf" .}}
 <label>CIDR <input name="cidr" placeholder="192.168.1.0/24" required></label>
 <label>Name <input name="name" placeholder="Home LAN"></label>
 <label>Scan interval (s) <input name="scan_interval_sec" type="number" value="300" min="30"></label>
@@ -16,6 +17,7 @@
 <td>{{.Name}}</td>
 <td>
 <form method="post" action="/subnets/{{.ID}}/toggle" class="row-action">
+{{template "csrf" $}}
 <button type="submit" class="{{if .ScanEnabled}}secondary{{end}}">{{if .ScanEnabled}}disable{{else}}enable{{end}}</button>
 </form>
 </td>
@@ -23,6 +25,7 @@
 <td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline">!</span>{{end}}</td>
 <td>
 <form method="post" action="/subnets/{{.ID}}/delete" class="row-action" onsubmit="return confirm('Delete {{.CIDR}}?')">
+{{template "csrf" $}}
 <button type="submit" class="danger">Delete</button>
 </form>
 </td>

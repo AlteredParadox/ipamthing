@@ -11,8 +11,9 @@
 <span>last scan: {{relTime .Subnet.LastScanAt}}</span>
 </div>
 <div class="actions">
-<form method="post" action="/subnets/{{.Subnet.ID}}/scan"><button type="submit">Scan now</button></form>
+<form method="post" action="/subnets/{{.Subnet.ID}}/scan">{{template "csrf" $}}<button type="submit">Scan now</button></form>
 <form method="post" action="/subnets/{{.Subnet.ID}}/toggle">
+{{template "csrf" $}}
 <input type="hidden" name="redirect" value="/subnets/{{.Subnet.ID}}">
 <button type="submit" class="secondary">{{if .Subnet.ScanEnabled}}disable scanning{{else}}enable scanning{{end}}</button>
 </form>
@@ -24,12 +25,14 @@
 {{if not .ICMPAvailable}}<div class="info">ICMP scanning unavailable (needs CAP_NET_RAW or <code>net.ipv4.ping_group_range</code>). Using neighbor table + TCP probes only.</div>{{end}}
 
 <form method="post" action="/subnets/{{.Subnet.ID}}/edit" class="inline-form edit-meta">
+{{template "csrf" $}}
 <label>Name <input name="name" value="{{.Subnet.Name}}"></label>
 <label>Scan interval (s) <input name="scan_interval_sec" type="number" min="30" value="{{.Subnet.ScanIntervalSec}}"></label>
 <button type="submit" class="secondary">Save</button>
 </form>
 
 <form id="bulk-form" method="post" action="/subnets/{{.Subnet.ID}}/hosts/bulk">
+{{template "csrf" $}}
 <input type="hidden" name="action" id="bulk-action" value="">
 <input type="hidden" name="comments" id="bulk-comments" value="">
 <input type="hidden" name="tags" id="bulk-tags" value="">
@@ -54,7 +57,7 @@
 </div>
 {{end}}
 
-{{range .Hosts}}<form id="hf-{{.ID}}" method="post" action="/hosts/{{.ID}}"></form>{{end}}
+{{range .Hosts}}<form id="hf-{{.ID}}" method="post" action="/hosts/{{.ID}}">{{template "csrf" $}}</form>{{end}}
 
 <table class="hosts-table">
 <thead><tr>

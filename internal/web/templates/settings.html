@@ -2,6 +2,7 @@
 <h1>Settings</h1>
 
 <form method="post" action="/settings" class="settings-form">
+{{template "csrf" .}}
 
 <label>Theme
 <select name="theme">

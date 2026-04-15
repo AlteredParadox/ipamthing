@@ -2,11 +2,42 @@ package web
 
 import (
 	"context"
+	"crypto/subtle"
 	"net/http"
 	"strings"
 
 	"ipamthing/internal/auth"
 )
+
+// csrf enforces double-submit cookie CSRF on state-changing requests.
+// For GET/HEAD/OPTIONS it is a no-op. For other methods, it requires a
+// "csrf_token" form value that matches the "csrf" cookie byte-for-byte.
+// render() is responsible for issuing the cookie on the first GET.
+func (s *Server) csrf(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		}
+		// Skip static files (they're served by a sub-mux but guard anyway).
+		if strings.HasPrefix(r.URL.Path, "/static/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		c, err := r.Cookie("csrf")
+		if err != nil || c.Value == "" {
+			http.Error(w, "CSRF cookie missing — reload the page and retry", http.StatusForbidden)
+			return
+		}
+		submitted := r.FormValue("csrf_token")
+		if submitted == "" || subtle.ConstantTimeCompare([]byte(submitted), []byte(c.Value)) != 1 {
+			http.Error(w, "CSRF token mismatch — reload the page and retry", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 type ctxKey string
 

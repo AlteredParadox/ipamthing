@@ -2,6 +2,7 @@
 <h1>Create admin account</h1>
 <p>No users exist yet. Create the first admin to continue. This requires the one-time setup token printed to the server log (or passed via <code>-setup-token</code>).</p>
 <form method="post" action="/setup">
+{{template "csrf" .}}
 <label>Setup token <input name="setup_token" required autofocus autocomplete="off"></label>
 <label>Username <input name="username" required></label>
 <label>Password (8+ chars) <input name="password" type="password" required minlength="8"></label>

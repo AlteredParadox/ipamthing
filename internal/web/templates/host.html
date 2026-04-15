@@ -23,6 +23,7 @@
 </dl>
 
 <form method="post" action="/hosts/{{.Host.ID}}" class="host-edit-form">
+{{template "csrf" $}}
 <input type="hidden" name="redirect" value="/hosts/{{.Host.ID}}">
 <label>Hostname override
 <input name="hostname_override" value="{{.Host.HostnameOverride}}" placeholder="{{if .Host.HostnameDNS}}{{.Host.HostnameDNS}}{{else}}(no DNS){{end}}">

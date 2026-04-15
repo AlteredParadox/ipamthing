@@ -1,9 +1,11 @@
 package web
 
 import (
+	"crypto/rand"
 	"crypto/subtle"
 	"database/sql"
 	"encoding/csv"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -16,6 +18,38 @@ import (
 
 	"ipamthing/internal/auth"
 )
+
+const maxScanIntervalSec = 24 * 3600
+
+// clientIP returns the request's client IP, honoring X-Forwarded-For only
+// when trustProxy is true (configured via -trust-proxy).
+func clientIP(r *http.Request, trustProxy bool) string {
+	if trustProxy {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			if i := strings.IndexByte(xff, ','); i > 0 {
+				return strings.TrimSpace(xff[:i])
+			}
+			return strings.TrimSpace(xff)
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// isHTTPS reports whether the request is being served over TLS, either
+// directly or via a trusted reverse proxy.
+func isHTTPS(r *http.Request, trustProxy bool) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if trustProxy && r.Header.Get("X-Forwarded-Proto") == "https" {
+		return true
+	}
+	return false
+}
 
 // safeRedirect returns target if it's a safe same-origin path, otherwise fallback.
 // Accepts only paths that start with "/" and don't start with "//" or "/\"
@@ -44,6 +78,7 @@ type pageData struct {
 	Notice string
 	Data   any
 	Prefs  userPrefs
+	CSRF   string
 }
 
 func readPrefs(r *http.Request) userPrefs {
@@ -64,10 +99,34 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 		return
 	}
 	data.Prefs = readPrefs(r)
+	data.CSRF = s.ensureCSRFCookie(w, r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		s.logger.Error("render", "page", page, "err", err)
 	}
+}
+
+// ensureCSRFCookie returns the client's csrf cookie value, issuing a fresh
+// random one (and setting it on the response) if missing.
+func (s *Server) ensureCSRFCookie(w http.ResponseWriter, r *http.Request) string {
+	if c, err := r.Cookie("csrf"); err == nil && len(c.Value) >= 32 {
+		return c.Value
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		s.logger.Error("csrf rand", "err", err)
+		return ""
+	}
+	token := hex.EncodeToString(buf)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   365 * 24 * 3600,
+		SameSite: http.SameSiteLaxMode,
+		Secure:   isHTTPS(r, s.trustProxy),
+	})
+	return token
 }
 
 func (s *Server) userCount() (int, error) {
@@ -134,6 +193,14 @@ func (s *Server) getLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
+	ip := clientIP(r, s.trustProxy)
+	if allowed, retryAfter := s.loginLimiter.Allow(ip); !allowed {
+		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
+		flash := fmt.Sprintf("too many failed attempts — try again in %s", retryAfter.Round(time.Second))
+		s.render(w, r, "login", pageData{Title: "Sign in", Flash: flash})
+		return
+	}
+
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
@@ -153,9 +220,11 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 	// Always run bcrypt so timing does not leak user existence.
 	passwordOK := auth.CheckPassword(hash, password)
 	if !userFound || !passwordOK {
+		s.loginLimiter.Fail(ip)
 		s.render(w, r, "login", pageData{Title: "Sign in", Flash: "invalid credentials"})
 		return
 	}
+	s.loginLimiter.Success(ip)
 
 	sess, err := s.sessions.Create(id)
 	if err != nil {
@@ -169,6 +238,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		Expires:  sess.ExpiresAt,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
+		Secure:   isHTTPS(r, s.trustProxy),
 	})
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -341,6 +411,9 @@ func (s *Server) createSubnet(w http.ResponseWriter, r *http.Request) {
 	if interval < 30 {
 		interval = 300
 	}
+	if interval > maxScanIntervalSec {
+		interval = maxScanIntervalSec
+	}
 	if _, _, err := net.ParseCIDR(cidr); err != nil {
 		http.Redirect(w, r, "/subnets?err=invalid_cidr", http.StatusSeeOther)
 		return
@@ -374,6 +447,9 @@ func (s *Server) editSubnet(w http.ResponseWriter, r *http.Request) {
 	interval, _ := strconv.Atoi(r.FormValue("scan_interval_sec"))
 	if interval < 30 {
 		interval = 30
+	}
+	if interval > maxScanIntervalSec {
+		interval = maxScanIntervalSec
 	}
 	if _, err := s.db.Exec(
 		`UPDATE subnets SET name = ?, scan_interval_sec = ? WHERE id = ?`,
