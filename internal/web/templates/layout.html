@@ -1,5 +1,5 @@
 {{define "layout"}}<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{.Prefs.Theme}}" data-layout="{{.Prefs.Layout}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -13,11 +13,13 @@
 <a href="/">dashboard</a>
 <a href="/subnets">subnets</a>
 <a href="/events">events</a>
+<a href="/settings">settings</a>
 <form method="post" action="/logout" class="logout-form"><button type="submit">logout</button></form>
 </nav>
 </header>
 <main>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .Notice}}<div class="info">{{.Notice}}</div>{{end}}
 {{template "content" .}}
 </main>
 </body>

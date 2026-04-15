@@ -55,7 +55,7 @@ var funcMap = template.FuncMap{
 }
 
 func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, scanner *scan.Scanner, scheduler *scan.Scheduler) http.Handler {
-	pages := []string{"setup", "login", "subnets", "hosts", "host", "events", "dashboard"}
+	pages := []string{"setup", "login", "subnets", "hosts", "host", "events", "dashboard", "settings"}
 	tmpls := make(map[string]*template.Template, len(pages))
 	for _, p := range pages {
 		t := template.New("").Funcs(funcMap)
@@ -100,6 +100,9 @@ func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, sca
 
 	mux.Handle("GET /events", s.auth(http.HandlerFunc(s.events)))
 	mux.Handle("GET /events/export.csv", s.auth(http.HandlerFunc(s.exportEvents)))
+
+	mux.Handle("GET /settings", s.auth(http.HandlerFunc(s.getSettings)))
+	mux.Handle("POST /settings", s.auth(http.HandlerFunc(s.postSettings)))
 
 	return s.firstRun(mux)
 }

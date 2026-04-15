@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>Settings</h1>
+
+<form method="post" action="/settings" class="settings-form">
+
+<label>Theme
+<select name="theme">
+<option value="light" {{if eq .Prefs.Theme "light"}}selected{{end}}>Light</option>
+<option value="dark" {{if eq .Prefs.Theme "dark"}}selected{{end}}>Dark</option>
+</select>
+<div class="field-help">Applies to all pages; stored in a browser cookie.</div>
+</label>
+
+<label class="checkbox-row">
+<input type="checkbox" name="full_width" value="1" {{if eq .Prefs.Layout "wide"}}checked{{end}}>
+Full-width layout
+</label>
+<div class="field-help">Removes the 1200px max width so tables use the full browser width.</div>
+
+<button type="submit">Save</button>
+
+</form>
+{{end}}

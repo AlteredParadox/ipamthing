@@ -16,18 +16,37 @@ import (
 	"ipamthing/internal/auth"
 )
 
-type pageData struct {
-	Title string
-	Flash string
-	Data  any
+type userPrefs struct {
+	Theme  string
+	Layout string
 }
 
-func (s *Server) render(w http.ResponseWriter, page string, data pageData) {
+type pageData struct {
+	Title  string
+	Flash  string
+	Notice string
+	Data   any
+	Prefs  userPrefs
+}
+
+func readPrefs(r *http.Request) userPrefs {
+	p := userPrefs{Theme: "light", Layout: "normal"}
+	if c, err := r.Cookie("theme"); err == nil && (c.Value == "dark" || c.Value == "light") {
+		p.Theme = c.Value
+	}
+	if c, err := r.Cookie("layout"); err == nil && (c.Value == "wide" || c.Value == "normal") {
+		p.Layout = c.Value
+	}
+	return p
+}
+
+func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, data pageData) {
 	t, ok := s.tmpls[page]
 	if !ok {
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
 	}
+	data.Prefs = readPrefs(r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		s.logger.Error("render", "page", page, "err", err)
@@ -47,7 +66,7 @@ func (s *Server) getSetup(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	s.render(w, "setup", pageData{Title: "Set up admin"})
+	s.render(w, r, "setup", pageData{Title: "Set up admin"})
 }
 
 func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +77,7 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	if username == "" || len(password) < 8 {
-		s.render(w, "setup", pageData{Title: "Set up admin", Flash: "username required and password must be 8+ chars"})
+		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "username required and password must be 8+ chars"})
 		return
 	}
 	hash, err := auth.HashPassword(password)
@@ -70,14 +89,14 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)`,
 		username, hash, time.Now().Unix(),
 	); err != nil {
-		s.render(w, "setup", pageData{Title: "Set up admin", Flash: "failed to create user"})
+		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "failed to create user"})
 		return
 	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (s *Server) getLogin(w http.ResponseWriter, r *http.Request) {
-	s.render(w, "login", pageData{Title: "Sign in"})
+	s.render(w, r, "login", pageData{Title: "Sign in"})
 }
 
 func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +109,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		`SELECT id, password_hash FROM users WHERE username = ?`, username,
 	).Scan(&id, &hash)
 	if errors.Is(err, sql.ErrNoRows) || (err == nil && !auth.CheckPassword(hash, password)) {
-		s.render(w, "login", pageData{Title: "Sign in", Flash: "invalid credentials"})
+		s.render(w, r, "login", pageData{Title: "Sign in", Flash: "invalid credentials"})
 		return
 	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
@@ -227,7 +246,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	erows.Close()
 
-	s.render(w, "dashboard", pageData{Title: "Dashboard", Data: d})
+	s.render(w, r, "dashboard", pageData{Title: "Dashboard", Data: d})
 }
 
 // ---- subnets ----
@@ -272,7 +291,7 @@ func (s *Server) listSubnets(w http.ResponseWriter, r *http.Request) {
 	case "insert_failed":
 		flash = "failed to save subnet (duplicate CIDR?)"
 	}
-	s.render(w, "subnets", pageData{Title: "Subnets", Flash: flash, Data: subnets})
+	s.render(w, r, "subnets", pageData{Title: "Subnets", Flash: flash, Data: subnets})
 }
 
 func (s *Server) createSubnet(w http.ResponseWriter, r *http.Request) {
@@ -442,7 +461,7 @@ func (s *Server) viewSubnet(w http.ResponseWriter, r *http.Request) {
 		flash = "last scan error: " + sub.LastScanErr
 	}
 
-	s.render(w, "hosts", pageData{
+	s.render(w, r, "hosts", pageData{
 		Title: "Hosts — " + sub.CIDR,
 		Flash: flash,
 		Data: hostsPageData{
@@ -542,7 +561,7 @@ func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
 		title = h.HostnameDNS + " (" + h.IP + ")"
 	}
 
-	s.render(w, "host", pageData{
+	s.render(w, r, "host", pageData{
 		Title: title,
 		Data:  hostDetailData{Host: h, Subnet: sub, Events: events},
 	})
@@ -620,7 +639,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		nextCursor = events[len(events)-1].EventID
 	}
 
-	s.render(w, "events", pageData{
+	s.render(w, r, "events", pageData{
 		Title: "Recent activity",
 		Data:  eventsPageData{Events: events, HasMore: hasMore, NextCursor: nextCursor},
 	})
@@ -734,6 +753,37 @@ func (s *Server) exportEvents(w http.ResponseWriter, r *http.Request) {
 func normalizeTags(s string) string {
 	fields := strings.Fields(s)
 	return strings.Join(fields, " ")
+}
+
+// ---- settings ----
+
+func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
+	notice := ""
+	if r.URL.Query().Get("saved") == "1" {
+		notice = "Settings saved."
+	}
+	s.render(w, r, "settings", pageData{Title: "Settings", Notice: notice})
+}
+
+func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
+	theme := "light"
+	if r.FormValue("theme") == "dark" {
+		theme = "dark"
+	}
+	layout := "normal"
+	if r.FormValue("full_width") != "" {
+		layout = "wide"
+	}
+	const oneYear = 365 * 24 * 3600
+	http.SetCookie(w, &http.Cookie{
+		Name: "theme", Value: theme, Path: "/",
+		MaxAge: oneYear, SameSite: http.SameSiteLaxMode,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name: "layout", Value: layout, Path: "/",
+		MaxAge: oneYear, SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, "/settings?saved=1", http.StatusSeeOther)
 }
 
 // ---- bulk operations ----
