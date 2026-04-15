@@ -1,4 +1,6 @@
 /ipamthing
+/ipamthing-linux-amd64
+/ipamthing-linux-arm64
 /ipamthing.db
 /ipamthing.db-wal
 /ipamthing.db-shm
