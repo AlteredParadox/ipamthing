@@ -1,0 +1,148 @@
+{{define "content"}}
+{{with .Data}}
+<p class="breadcrumbs"><a href="/subnets">subnets</a> / <code>{{.Subnet.CIDR}}</code></p>
+
+<div class="subnet-header">
+<h1>{{if .Subnet.Name}}{{.Subnet.Name}}{{else}}{{.Subnet.CIDR}}{{end}}</h1>
+<div class="meta">
+<span>CIDR: <code>{{.Subnet.CIDR}}</code></span>
+<span>scanning: {{if .Subnet.ScanEnabled}}on{{else}}off{{end}}</span>
+<span>interval: {{.Subnet.ScanIntervalSec}}s</span>
+<span>last scan: {{relTime .Subnet.LastScanAt}}</span>
+</div>
+<div class="actions">
+<form method="post" action="/subnets/{{.Subnet.ID}}/scan"><button type="submit">Scan now</button></form>
+<form method="post" action="/subnets/{{.Subnet.ID}}/toggle">
+<input type="hidden" name="redirect" value="/subnets/{{.Subnet.ID}}">
+<button type="submit" class="secondary">{{if .Subnet.ScanEnabled}}disable scanning{{else}}enable scanning{{end}}</button>
+</form>
+<a class="button-link secondary" href="/subnets/{{.Subnet.ID}}/export.csv">Export CSV</a>
+</div>
+</div>
+
+{{if .ScanQueued}}<div class="info">Scan queued. Refresh the page in a few seconds to see results.</div>{{end}}
+{{if not .ICMPAvailable}}<div class="info">ICMP scanning unavailable (needs CAP_NET_RAW or <code>net.ipv4.ping_group_range</code>). Using neighbor table + TCP probes only.</div>{{end}}
+
+<form method="post" action="/subnets/{{.Subnet.ID}}/edit" class="inline-form edit-meta">
+<label>Name <input name="name" value="{{.Subnet.Name}}"></label>
+<label>Scan interval (s) <input name="scan_interval_sec" type="number" min="30" value="{{.Subnet.ScanIntervalSec}}"></label>
+<button type="submit" class="secondary">Save</button>
+</form>
+
+<form id="bulk-form" method="post" action="/subnets/{{.Subnet.ID}}/hosts/bulk">
+<input type="hidden" name="action" id="bulk-action" value="">
+<input type="hidden" name="comments" id="bulk-comments" value="">
+<input type="hidden" name="tags" id="bulk-tags" value="">
+</form>
+
+{{if .Hosts}}
+<div class="toolbar">
+<input type="text" id="host-filter" placeholder="filter by ip, hostname, mac, comment, tag…" aria-label="filter hosts">
+<span id="filter-count" class="muted"></span>
+</div>
+
+<div class="bulk-bar">
+<span id="bulk-count" class="muted">0 selected</span>
+<select id="bulk-action-select" aria-label="bulk action">
+<option value="">Bulk action…</option>
+<option value="set_comment">Set comment</option>
+<option value="set_tags">Set tags</option>
+<option value="delete">Delete</option>
+</select>
+<input type="text" id="bulk-value-input" placeholder="value (for comment / tags)">
+<button type="button" onclick="bulkApply()">Apply</button>
+</div>
+{{end}}
+
+{{range .Hosts}}<form id="hf-{{.ID}}" method="post" action="/hosts/{{.ID}}"></form>{{end}}
+
+<table class="hosts-table">
+<thead><tr>
+<th><input type="checkbox" id="select-all" aria-label="select all"></th>
+<th>IP</th><th>Hostname</th><th>MAC</th><th>Status</th><th>Tags</th><th>Last seen</th><th>Comments</th><th></th><th></th>
+</tr></thead>
+<tbody>
+{{range .Hosts}}
+<tr class="host-row status-{{.Status}}" data-search="{{.IP}} {{.HostnameDNS}} {{.HostnameOverride}} {{.MAC}} {{.Comments}} {{.Tags}} {{.Status}}">
+<td><input type="checkbox" class="host-check" form="bulk-form" name="host_ids" value="{{.ID}}" aria-label="select {{.IP}}"></td>
+<td><code>{{.IP}}</code></td>
+<td>
+<input form="hf-{{.ID}}" name="hostname_override" value="{{.HostnameOverride}}" placeholder="{{if .HostnameDNS}}{{.HostnameDNS}}{{else}}(no DNS){{end}}">
+{{if and .HostnameOverride .HostnameDNS}}<div class="muted">DNS: {{.HostnameDNS}}</div>{{end}}
+</td>
+<td>{{if .MAC}}<code>{{.MAC}}</code>{{end}}</td>
+<td><span class="status-pill status-{{.Status}}">{{.Status}}</span></td>
+<td class="tag-cell">{{range fields .Tags}}<span class="tag-pill">{{.}}</span>{{end}}</td>
+<td>{{relTime .LastSeen}}</td>
+<td><input form="hf-{{.ID}}" name="comments" value="{{.Comments}}"></td>
+<td><button form="hf-{{.ID}}" type="submit" class="secondary">Save</button></td>
+<td><a href="/hosts/{{.ID}}" class="row-link">history</a></td>
+</tr>
+{{else}}
+<tr><td colspan="10"><em>No hosts yet. Click "Scan now" to discover hosts on {{.Subnet.CIDR}}.</em></td></tr>
+{{end}}
+</tbody>
+</table>
+
+<script>
+(function () {
+  var selectAll = document.getElementById('select-all');
+  var countEl = document.getElementById('bulk-count');
+  function checks() { return document.querySelectorAll('.host-check'); }
+  function visibleChecks() {
+    return Array.prototype.filter.call(checks(), function (c) {
+      return c.closest('tr').style.display !== 'none';
+    });
+  }
+  function updateCount() {
+    var n = document.querySelectorAll('.host-check:checked').length;
+    if (countEl) countEl.textContent = n + ' selected';
+  }
+  if (selectAll) {
+    selectAll.addEventListener('change', function (e) {
+      visibleChecks().forEach(function (c) { c.checked = e.target.checked; });
+      updateCount();
+    });
+  }
+  document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('host-check')) updateCount();
+  });
+
+  window.bulkApply = function () {
+    var action = document.getElementById('bulk-action-select').value;
+    if (!action) { alert('Choose a bulk action'); return; }
+    var n = document.querySelectorAll('.host-check:checked').length;
+    if (n === 0) { alert('No hosts selected'); return; }
+    var msg;
+    if (action === 'delete') msg = 'Delete selected hosts?';
+    else if (action === 'set_comment') msg = 'Set comment on selected hosts?';
+    else msg = 'Set tags on selected hosts?';
+    if (!confirm(msg + ' (' + n + ' host' + (n === 1 ? '' : 's') + ')')) return;
+    var value = document.getElementById('bulk-value-input').value;
+    document.getElementById('bulk-action').value = action;
+    if (action === 'set_comment') document.getElementById('bulk-comments').value = value;
+    if (action === 'set_tags') document.getElementById('bulk-tags').value = value;
+    document.getElementById('bulk-form').submit();
+  };
+
+  var filterInput = document.getElementById('host-filter');
+  var filterCount = document.getElementById('filter-count');
+  if (filterInput) {
+    filterInput.addEventListener('input', function () {
+      var q = filterInput.value.toLowerCase().trim();
+      var shown = 0, total = 0;
+      document.querySelectorAll('tr.host-row').forEach(function (tr) {
+        total++;
+        if (!q) { tr.style.display = ''; shown++; return; }
+        var s = (tr.getAttribute('data-search') || '').toLowerCase();
+        var match = s.indexOf(q) >= 0;
+        tr.style.display = match ? '' : 'none';
+        if (match) shown++;
+      });
+      filterCount.textContent = q ? (shown + ' of ' + total) : '';
+    });
+  }
+})();
+</script>
+{{end}}
+{{end}}

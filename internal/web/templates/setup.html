@@ -1,0 +1,9 @@
+{{define "content"}}
+<h1>Create admin account</h1>
+<p>No users exist yet. Create the first admin to continue.</p>
+<form method="post" action="/setup">
+<label>Username <input name="username" required autofocus></label>
+<label>Password (8+ chars) <input name="password" type="password" required minlength="8"></label>
+<button type="submit">Create admin</button>
+</form>
+{{end}}

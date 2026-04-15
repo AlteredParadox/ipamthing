@@ -1,0 +1,58 @@
+{{define "content"}}
+{{with .Data}}
+<p class="breadcrumbs">
+<a href="/subnets">subnets</a> /
+<a href="/subnets/{{.Subnet.ID}}"><code>{{.Subnet.CIDR}}</code></a> /
+<code>{{.Host.IP}}</code>
+</p>
+
+<h1>
+{{if .Host.HostnameOverride}}{{.Host.HostnameOverride}}
+{{else if .Host.HostnameDNS}}{{.Host.HostnameDNS}}
+{{else}}{{.Host.IP}}{{end}}
+</h1>
+
+<dl class="host-facts">
+<dt>IP</dt><dd><code>{{.Host.IP}}</code></dd>
+<dt>Status</dt><dd><span class="status-pill status-{{.Host.Status}}">{{.Host.Status}}</span></dd>
+<dt>MAC</dt><dd>{{if .Host.MAC}}<code>{{.Host.MAC}}</code>{{else}}<span class="muted">—</span>{{end}}</dd>
+<dt>DNS</dt><dd>{{if .Host.HostnameDNS}}{{.Host.HostnameDNS}}{{else}}<span class="muted">—</span>{{end}}</dd>
+<dt>Tags</dt><dd>{{if .Host.Tags}}{{range fields .Host.Tags}}<span class="tag-pill">{{.}}</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</dd>
+<dt>First seen</dt><dd>{{relTime .Host.FirstSeen}}</dd>
+<dt>Last seen</dt><dd>{{relTime .Host.LastSeen}}</dd>
+</dl>
+
+<form method="post" action="/hosts/{{.Host.ID}}" class="host-edit-form">
+<input type="hidden" name="redirect" value="/hosts/{{.Host.ID}}">
+<label>Hostname override
+<input name="hostname_override" value="{{.Host.HostnameOverride}}" placeholder="{{if .Host.HostnameDNS}}{{.Host.HostnameDNS}}{{else}}(no DNS){{end}}">
+</label>
+<label>Tags <small class="muted">space-separated</small>
+<input name="tags" value="{{.Host.Tags}}" placeholder="e.g. production web-server">
+</label>
+<label>Comments
+<textarea name="comments" rows="3">{{.Host.Comments}}</textarea>
+</label>
+<button type="submit">Save</button>
+</form>
+
+<h2>Scan history</h2>
+{{if .Events}}
+<table class="events-table">
+<thead><tr><th>When</th><th>Event</th><th>Details</th></tr></thead>
+<tbody>
+{{range .Events}}
+<tr>
+<td>{{relTime .TS}}</td>
+<td><span class="event-pill event-{{.Event}}">{{.Event}}</span></td>
+<td>{{if .Details}}<code>{{.Details}}</code>{{end}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+<p class="muted">Showing up to the last 100 events.</p>
+{{else}}
+<p><em>No events yet. Trigger a scan from the subnet page.</em></p>
+{{end}}
+{{end}}
+{{end}}

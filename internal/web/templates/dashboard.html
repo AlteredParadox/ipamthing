@@ -1,0 +1,58 @@
+{{define "content"}}
+{{with .Data}}
+<h1>Dashboard</h1>
+
+<div class="cards">
+<div class="card"><div class="card-num">{{.Totals.Subnets}}</div><div class="card-label">subnets</div></div>
+<div class="card"><div class="card-num">{{.Totals.Hosts}}</div><div class="card-label">hosts tracked</div></div>
+<div class="card card-up"><div class="card-num">{{.Totals.Up}}</div><div class="card-label">up</div></div>
+<div class="card card-down"><div class="card-num">{{.Totals.Down}}</div><div class="card-label">down</div></div>
+<div class="card"><div class="card-num">{{.Totals.Events24h}}</div><div class="card-label">events (24h)</div></div>
+</div>
+
+{{if not .ICMPAvailable}}
+<div class="info">ICMP disabled — scanning uses TCP connect + neighbor table only.</div>
+{{end}}
+
+<h2>Subnets</h2>
+<table>
+<thead><tr>
+<th>CIDR</th><th>Name</th><th>Hosts</th><th>Up</th><th>Scanning</th><th>Interval</th><th>Last scan</th>
+</tr></thead>
+<tbody>
+{{range .Subnets}}
+<tr>
+<td><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
+<td>{{.Name}}</td>
+<td>{{.Hosts}}</td>
+<td>{{.Up}}{{if .Hosts}} <span class="muted">/ {{.Hosts}}</span>{{end}}</td>
+<td>{{if .ScanEnabled}}on{{else}}off{{end}}</td>
+<td>{{.ScanIntervalSec}}s</td>
+<td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
+</tr>
+{{else}}
+<tr><td colspan="7"><em>No subnets yet. <a href="/subnets">Add one</a>.</em></td></tr>
+{{end}}
+</tbody>
+</table>
+
+<h2>Recent activity <a href="/events" class="row-link">see all →</a></h2>
+{{if .RecentEvents}}
+<table class="events-table">
+<thead><tr><th>When</th><th>Subnet</th><th>Host</th><th>Event</th></tr></thead>
+<tbody>
+{{range .RecentEvents}}
+<tr>
+<td>{{relTime .TS}}</td>
+<td><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
+<td><a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>{{if .EffectiveHostname}} <span class="muted">{{.EffectiveHostname}}</span>{{end}}</td>
+<td><span class="event-pill event-{{.Event}}">{{.Event}}</span></td>
+</tr>
+{{end}}
+</tbody>
+</table>
+{{else}}
+<p><em>No events yet.</em></p>
+{{end}}
+{{end}}
+{{end}}

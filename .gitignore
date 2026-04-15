@@ -1,0 +1,7 @@
+/ipamthing
+/ipamthing.db
+/ipamthing.db-wal
+/ipamthing.db-shm
+*.db
+*.db-wal
+*.db-shm

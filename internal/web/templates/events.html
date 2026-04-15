@@ -1,0 +1,34 @@
+{{define "content"}}
+{{with .Data}}
+<div class="row-between">
+<h1>Recent activity</h1>
+<a href="/events/export.csv" class="button-link secondary">Export CSV</a>
+</div>
+{{if .Events}}
+<table class="events-table">
+<thead><tr>
+<th>When</th><th>Subnet</th><th>Host</th><th>Event</th><th>Details</th>
+</tr></thead>
+<tbody>
+{{range .Events}}
+<tr>
+<td>{{relTime .TS}}</td>
+<td><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
+<td>
+<a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>
+{{if .EffectiveHostname}}<span class="muted"> {{.EffectiveHostname}}</span>{{end}}
+</td>
+<td><span class="event-pill event-{{.Event}}">{{.Event}}</span></td>
+<td>{{if .Details}}<code>{{.Details}}</code>{{end}}</td>
+</tr>
+{{end}}
+</tbody>
+</table>
+{{if .HasMore}}
+<p><a href="/events?before={{.NextCursor}}" class="row-link">older events →</a></p>
+{{end}}
+{{else}}
+<p><em>No events yet. Scan a subnet to generate some.</em></p>
+{{end}}
+{{end}}
+{{end}}

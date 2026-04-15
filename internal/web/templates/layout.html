@@ -1,0 +1,25 @@
+{{define "layout"}}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} — ipamthing</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+<nav>
+<strong>ipamthing</strong>
+<a href="/">dashboard</a>
+<a href="/subnets">subnets</a>
+<a href="/events">events</a>
+<form method="post" action="/logout" class="logout-form"><button type="submit">logout</button></form>
+</nav>
+</header>
+<main>
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{template "content" .}}
+</main>
+</body>
+</html>
+{{end}}
