@@ -1,6 +1,7 @@
 package web
 
 import (
+	"crypto/subtle"
 	"database/sql"
 	"encoding/csv"
 	"errors"
@@ -15,6 +16,22 @@ import (
 
 	"ipamthing/internal/auth"
 )
+
+// safeRedirect returns target if it's a safe same-origin path, otherwise fallback.
+// Accepts only paths that start with "/" and don't start with "//" or "/\"
+// (both of which can be interpreted as host-relative URLs by browsers).
+func safeRedirect(target, fallback string) string {
+	if target == "" {
+		return fallback
+	}
+	if !strings.HasPrefix(target, "/") {
+		return fallback
+	}
+	if strings.HasPrefix(target, "//") || strings.HasPrefix(target, `/\`) {
+		return fallback
+	}
+	return target
+}
 
 type userPrefs struct {
 	Theme  string
@@ -74,6 +91,16 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+
+	s.setupMu.Lock()
+	expected := s.setupToken
+	s.setupMu.Unlock()
+	submitted := r.FormValue("setup_token")
+	if expected == "" || subtle.ConstantTimeCompare([]byte(submitted), []byte(expected)) != 1 {
+		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "invalid setup token — check the server logs or restart with -setup-token"})
+		return
+	}
+
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	if username == "" || len(password) < 8 {
@@ -92,6 +119,13 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "failed to create user"})
 		return
 	}
+
+	// One-time token — burn it after a successful admin creation.
+	s.setupMu.Lock()
+	s.setupToken = ""
+	s.setupMu.Unlock()
+	s.logger.Info("first-run setup completed; setup token consumed")
+
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -108,12 +142,18 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 	err := s.db.QueryRow(
 		`SELECT id, password_hash FROM users WHERE username = ?`, username,
 	).Scan(&id, &hash)
-	if errors.Is(err, sql.ErrNoRows) || (err == nil && !auth.CheckPassword(hash, password)) {
-		s.render(w, r, "login", pageData{Title: "Sign in", Flash: "invalid credentials"})
-		return
-	}
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	userFound := err == nil
+	if !userFound {
+		hash = auth.DummyHash()
+	}
+	// Always run bcrypt so timing does not leak user existence.
+	passwordOK := auth.CheckPassword(hash, password)
+	if !userFound || !passwordOK {
+		s.render(w, r, "login", pageData{Title: "Sign in", Flash: "invalid credentials"})
 		return
 	}
 
@@ -355,11 +395,7 @@ func (s *Server) toggleSubnet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	redirect := r.FormValue("redirect")
-	if redirect == "" {
-		redirect = "/subnets"
-	}
-	http.Redirect(w, r, redirect, http.StatusSeeOther)
+	http.Redirect(w, r, safeRedirect(r.FormValue("redirect"), "/subnets"), http.StatusSeeOther)
 }
 
 func (s *Server) scanSubnet(w http.ResponseWriter, r *http.Request) {
@@ -495,11 +531,7 @@ func (s *Server) updateHost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	redirect := r.FormValue("redirect")
-	if redirect == "" {
-		redirect = fmt.Sprintf("/subnets/%d", subnetID)
-	}
-	http.Redirect(w, r, redirect, http.StatusSeeOther)
+	http.Redirect(w, r, safeRedirect(r.FormValue("redirect"), fmt.Sprintf("/subnets/%d", subnetID)), http.StatusSeeOther)
 }
 
 func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {

@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"log/slog"
@@ -20,6 +22,7 @@ import (
 func main() {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "ipamthing.db", "SQLite database file path")
+	setupTokenFlag := flag.String("setup-token", "", "one-time token required for first-run /setup (random + logged if empty and no users exist)")
 	flag.Parse()
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -41,7 +44,30 @@ func main() {
 	scheduler := scan.NewScheduler(database, scanner, logger)
 	go scheduler.Run(ctx)
 
-	handler := web.NewRouter(logger, database, sessions, scanner, scheduler)
+	setupToken := ""
+	var userCount int
+	if err := database.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&userCount); err != nil {
+		logger.Error("count users for setup check", "err", err)
+		os.Exit(1)
+	}
+	if userCount == 0 {
+		setupToken = *setupTokenFlag
+		if setupToken == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				logger.Error("generate setup token", "err", err)
+				os.Exit(1)
+			}
+			setupToken = hex.EncodeToString(buf)
+			logger.Warn("first-run setup required — enter this token in /setup",
+				"setup_token", setupToken,
+				"note", "suppress this message by passing -setup-token=<value> next startup")
+		} else {
+			logger.Info("first-run setup required; using -setup-token value")
+		}
+	}
+
+	handler := web.NewRouter(logger, database, sessions, scanner, scheduler, setupToken)
 
 	srv := &http.Server{
 		Addr:              *addr,

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"ipamthing/internal/auth"
@@ -28,6 +29,9 @@ type Server struct {
 	scanner   *scan.Scanner
 	scheduler *scan.Scheduler
 	tmpls     map[string]*template.Template
+
+	setupMu    sync.Mutex
+	setupToken string // required for /setup; cleared after first admin is created
 }
 
 var funcMap = template.FuncMap{
@@ -54,7 +58,7 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, scanner *scan.Scanner, scheduler *scan.Scheduler) http.Handler {
+func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, scanner *scan.Scanner, scheduler *scan.Scheduler, setupToken string) http.Handler {
 	pages := []string{"setup", "login", "subnets", "hosts", "host", "events", "dashboard", "settings"}
 	tmpls := make(map[string]*template.Template, len(pages))
 	for _, p := range pages {
@@ -70,6 +74,7 @@ func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, sca
 	s := &Server{
 		logger: logger, db: db, sessions: sessions,
 		scanner: scanner, scheduler: scheduler, tmpls: tmpls,
+		setupToken: setupToken,
 	}
 
 	mux := http.NewServeMux()
