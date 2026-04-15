@@ -111,5 +111,5 @@ func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, log
 	mux.Handle("GET /settings", s.auth(http.HandlerFunc(s.getSettings)))
 	mux.Handle("POST /settings", s.auth(http.HandlerFunc(s.postSettings)))
 
-	return s.securityHeaders(s.csrf(s.firstRun(mux)))
+	return s.securityHeaders(s.limitBody(s.csrf(s.firstRun(mux))))
 }

@@ -9,6 +9,26 @@ import (
 	"ipamthing/internal/auth"
 )
 
+// maxRequestBody is the per-request body cap enforced by limitBody. It
+// bounds the memory ParseForm will allocate on unauthenticated endpoints
+// (login, setup) as well as authenticated ones. All legitimate forms are
+// well under this; the bulk-action form with hundreds of host ids is a
+// few kilobytes.
+const maxRequestBody = 1 << 20 // 1 MiB
+
+// limitBody wraps r.Body in http.MaxBytesReader. Any attempt to read past
+// the cap returns an error that causes ParseForm / FormValue to bail; in
+// practice that means CSRF validation fails with 403 before handlers do
+// meaningful work.
+func (s *Server) limitBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Body != nil {
+			r.Body = http.MaxBytesReader(w, r.Body, maxRequestBody)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // securityHeaders sets a conservative set of response headers that harden
 // the browser-side attack surface (clickjacking, MIME sniffing, referer
 // leakage) and a CSP that limits scripts/styles/form posts to same-origin.

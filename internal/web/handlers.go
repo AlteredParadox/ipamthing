@@ -36,12 +36,15 @@ func truncate(s string, max int) string {
 }
 
 // clientIP returns the request's client IP, honoring X-Forwarded-For only
-// when trustProxy is true (configured via -trust-proxy).
+// when trustProxy is true. The rightmost XFF entry is used because a
+// standard nginx "proxy_add_x_forwarded_for" directive appends the IP it
+// observed as its immediate source — which is the real client IP. The
+// leftmost entries may be attacker-supplied and must not be trusted.
 func clientIP(r *http.Request, trustProxy bool) string {
 	if trustProxy {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			if i := strings.IndexByte(xff, ','); i > 0 {
-				return strings.TrimSpace(xff[:i])
+			if i := strings.LastIndexByte(xff, ','); i >= 0 {
+				return strings.TrimSpace(xff[i+1:])
 			}
 			return strings.TrimSpace(xff)
 		}

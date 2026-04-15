@@ -109,6 +109,7 @@ func main() {
 		Addr:              *addr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
+		MaxHeaderBytes:    1 << 20, // 1 MiB
 	}
 
 	errc := make(chan error, 1)
