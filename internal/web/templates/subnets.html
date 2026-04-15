@@ -24,7 +24,7 @@
 <td>{{.ScanIntervalSec}}s</td>
 <td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline">!</span>{{end}}</td>
 <td>
-<form method="post" action="/subnets/{{.ID}}/delete" class="row-action" onsubmit="return confirm('Delete {{.CIDR}}?')">
+<form method="post" action="/subnets/{{.ID}}/delete" class="row-action" data-confirm="Delete {{.CIDR}}?">
 {{template "csrf" $}}
 <button type="submit" class="danger">Delete</button>
 </form>

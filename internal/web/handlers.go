@@ -19,7 +19,21 @@ import (
 	"ipamthing/internal/auth"
 )
 
-const maxScanIntervalSec = 24 * 3600
+const (
+	maxScanIntervalSec = 24 * 3600
+	maxUsernameLen     = 64
+	maxSubnetNameLen   = 100
+	maxHostnameLen     = 253
+	maxCommentsLen     = 2000
+	maxTagsLen         = 512
+)
+
+func truncate(s string, max int) string {
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
+}
 
 // clientIP returns the request's client IP, honoring X-Forwarded-For only
 // when trustProxy is true (configured via -trust-proxy).
@@ -123,6 +137,7 @@ func (s *Server) ensureCSRFCookie(w http.ResponseWriter, r *http.Request) string
 		Value:    token,
 		Path:     "/",
 		MaxAge:   365 * 24 * 3600,
+		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 		Secure:   isHTTPS(r, s.trustProxy),
 	})
@@ -160,7 +175,7 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := r.FormValue("username")
+	username := truncate(r.FormValue("username"), maxUsernameLen)
 	password := r.FormValue("password")
 	if username == "" || len(password) < 8 {
 		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "username required and password must be 8+ chars"})
@@ -406,7 +421,7 @@ func (s *Server) listSubnets(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) createSubnet(w http.ResponseWriter, r *http.Request) {
 	cidr := r.FormValue("cidr")
-	name := r.FormValue("name")
+	name := truncate(r.FormValue("name"), maxSubnetNameLen)
 	interval, _ := strconv.Atoi(r.FormValue("scan_interval_sec"))
 	if interval < 30 {
 		interval = 300
@@ -443,7 +458,7 @@ func (s *Server) editSubnet(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	name := r.FormValue("name")
+	name := truncate(r.FormValue("name"), maxSubnetNameLen)
 	interval, _ := strconv.Atoi(r.FormValue("scan_interval_sec"))
 	if interval < 30 {
 		interval = 30
@@ -591,9 +606,9 @@ func (s *Server) updateHost(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	override := r.FormValue("hostname_override")
-	comments := r.FormValue("comments")
-	tags := normalizeTags(r.FormValue("tags"))
+	override := truncate(r.FormValue("hostname_override"), maxHostnameLen)
+	comments := truncate(r.FormValue("comments"), maxCommentsLen)
+	tags := truncate(normalizeTags(r.FormValue("tags")), maxTagsLen)
 
 	var subnetID int64
 	if err := s.db.QueryRow(`SELECT subnet_id FROM hosts WHERE id = ?`, id).Scan(&subnetID); err != nil {
@@ -883,13 +898,14 @@ func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
 		layout = "wide"
 	}
 	const oneYear = 365 * 24 * 3600
+	secure := isHTTPS(r, s.trustProxy)
 	http.SetCookie(w, &http.Cookie{
 		Name: "theme", Value: theme, Path: "/",
-		MaxAge: oneYear, SameSite: http.SameSiteLaxMode,
+		MaxAge: oneYear, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure,
 	})
 	http.SetCookie(w, &http.Cookie{
 		Name: "layout", Value: layout, Path: "/",
-		MaxAge: oneYear, SameSite: http.SameSiteLaxMode,
+		MaxAge: oneYear, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure,
 	})
 	http.Redirect(w, r, "/settings?saved=1", http.StatusSeeOther)
 }
@@ -933,11 +949,11 @@ func (s *Server) bulkHosts(w http.ResponseWriter, r *http.Request) {
 		query = fmt.Sprintf(`DELETE FROM hosts WHERE subnet_id = ? AND id IN (%s)`, placeholders)
 		args = append([]any{subnetID}, idArgs...)
 	case "set_comment":
-		comments := r.FormValue("comments")
+		comments := truncate(r.FormValue("comments"), maxCommentsLen)
 		query = fmt.Sprintf(`UPDATE hosts SET comments = ? WHERE subnet_id = ? AND id IN (%s)`, placeholders)
 		args = append([]any{comments, subnetID}, idArgs...)
 	case "set_tags":
-		tags := normalizeTags(r.FormValue("tags"))
+		tags := truncate(normalizeTags(r.FormValue("tags")), maxTagsLen)
 		query = fmt.Sprintf(`UPDATE hosts SET tags = ? WHERE subnet_id = ? AND id IN (%s)`, placeholders)
 		args = append([]any{tags, subnetID}, idArgs...)
 	default:

@@ -9,6 +9,28 @@ import (
 	"ipamthing/internal/auth"
 )
 
+// securityHeaders sets a conservative set of response headers that harden
+// the browser-side attack surface (clickjacking, MIME sniffing, referer
+// leakage) and a CSP that limits scripts/styles/form posts to same-origin.
+// Inline scripts are not allowed — any JS lives under /static/.
+func (s *Server) securityHeaders(next http.Handler) http.Handler {
+	const csp = "default-src 'self'; " +
+		"script-src 'self'; " +
+		"style-src 'self'; " +
+		"img-src 'self' data:; " +
+		"form-action 'self'; " +
+		"frame-ancestors 'none'; " +
+		"base-uri 'self'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h := w.Header()
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("X-Frame-Options", "DENY")
+		h.Set("Referrer-Policy", "same-origin")
+		h.Set("Content-Security-Policy", csp)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // csrf enforces double-submit cookie CSRF on state-changing requests.
 // For GET/HEAD/OPTIONS it is a no-op. For other methods, it requires a
 // "csrf_token" form value that matches the "csrf" cookie byte-for-byte.

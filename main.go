@@ -128,6 +128,7 @@ func main() {
 		}
 	case <-sigc:
 		logger.Info("shutting down")
+		cancel() // signal background goroutines (scheduler, purge loops) to stop
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer shutdownCancel()
 		_ = srv.Shutdown(shutdownCtx)
