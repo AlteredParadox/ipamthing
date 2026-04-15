@@ -19,6 +19,7 @@ var alters = []string{
 	`ALTER TABLE hosts ADD COLUMN tags TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE users ADD COLUMN ui_theme TEXT NOT NULL DEFAULT 'light'`,
 	`ALTER TABLE users ADD COLUMN ui_layout TEXT NOT NULL DEFAULT 'normal'`,
+	`ALTER TABLE users ADD COLUMN ui_density TEXT NOT NULL DEFAULT 'standard'`,
 }
 
 func Open(path string) (*sql.DB, error) {

@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash TEXT    NOT NULL,
     ui_theme      TEXT    NOT NULL DEFAULT 'light',
     ui_layout     TEXT    NOT NULL DEFAULT 'normal',
+    ui_density    TEXT    NOT NULL DEFAULT 'standard',
     created_at    INTEGER NOT NULL
 );
 

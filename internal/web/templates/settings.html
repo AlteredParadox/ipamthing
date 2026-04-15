@@ -18,6 +18,14 @@ Full-width layout
 </label>
 <div class="field-help">Removes the 1200px max width so tables use the full browser width.</div>
 
+<label>Density
+<select name="density">
+<option value="standard" {{if eq .Prefs.Density "standard"}}selected{{end}}>Standard</option>
+<option value="compact" {{if eq .Prefs.Density "compact"}}selected{{end}}>Compact</option>
+</select>
+<div class="field-help">Compact shrinks the top bar and table row padding for more data on screen.</div>
+</label>
+
 <button type="submit">Save</button>
 
 </form>

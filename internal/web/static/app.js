@@ -5,6 +5,21 @@
     bindBulk();
     bindFilter();
     bindConfirms();
+    bindRowEdit();
+  }
+
+  // "Edit" button on a host row: swap that row into edit mode so the
+  // hostname and comments inputs appear. Save is the existing form submit.
+  function bindRowEdit() {
+    document.querySelectorAll('button.edit-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var row = btn.closest('tr');
+        if (!row) return;
+        row.classList.add('editing');
+        var input = row.querySelector('input[name="hostname_override"]');
+        if (input) input.focus();
+      });
+    });
   }
 
   function bindBulk() {

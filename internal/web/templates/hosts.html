@@ -70,15 +70,22 @@
 <td><input type="checkbox" class="host-check" form="bulk-form" name="host_ids" value="{{.ID}}" aria-label="select {{.IP}}"></td>
 <td><code>{{.IP}}</code></td>
 <td>
-<input form="hf-{{.ID}}" name="hostname_override" value="{{.HostnameOverride}}" placeholder="{{if .HostnameDNS}}{{.HostnameDNS}}{{else}}(no DNS){{end}}">
+<span class="view-only">{{if .HostnameOverride}}{{.HostnameOverride}}{{else if .HostnameDNS}}{{.HostnameDNS}}{{else}}<span class="muted">—</span>{{end}}</span>
+<input class="edit-only" form="hf-{{.ID}}" name="hostname_override" value="{{.HostnameOverride}}" placeholder="{{if .HostnameDNS}}{{.HostnameDNS}}{{else}}(no DNS){{end}}">
 {{if and .HostnameOverride .HostnameDNS}}<div class="muted">DNS: {{.HostnameDNS}}</div>{{end}}
 </td>
 <td>{{if .MAC}}<code>{{.MAC}}</code>{{end}}</td>
 <td><span class="status-pill status-{{.Status}}">{{.Status}}</span></td>
 <td class="tag-cell">{{range fields .Tags}}<span class="tag-pill">{{.}}</span>{{end}}</td>
 <td>{{relTime .LastSeen}}</td>
-<td><input form="hf-{{.ID}}" name="comments" value="{{.Comments}}"></td>
-<td><button form="hf-{{.ID}}" type="submit" class="secondary">Save</button></td>
+<td>
+<span class="view-only">{{if .Comments}}{{.Comments}}{{else}}<span class="muted">—</span>{{end}}</span>
+<input class="edit-only" form="hf-{{.ID}}" name="comments" value="{{.Comments}}">
+</td>
+<td>
+<button type="button" class="edit-btn secondary view-only">Edit</button>
+<button form="hf-{{.ID}}" type="submit" class="edit-only">Save</button>
+</td>
 <td><a href="/hosts/{{.ID}}" class="row-link">history</a></td>
 </tr>
 {{else}}

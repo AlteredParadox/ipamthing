@@ -88,8 +88,9 @@ func safeRedirect(target, fallback string) string {
 }
 
 type userPrefs struct {
-	Theme  string
-	Layout string
+	Theme   string
+	Layout  string
+	Density string
 }
 
 type pageData struct {
@@ -106,15 +107,15 @@ type pageData struct {
 // preference is a per-account property that follows the user across
 // browsers and machines.
 func (s *Server) readPrefs(r *http.Request) userPrefs {
-	p := userPrefs{Theme: "light", Layout: "normal"}
+	p := userPrefs{Theme: "light", Layout: "normal", Density: "standard"}
 	uid, ok := r.Context().Value(userIDKey).(int64)
 	if !ok || uid == 0 {
 		return p
 	}
-	var theme, layout string
+	var theme, layout, density string
 	err := s.db.QueryRow(
-		`SELECT ui_theme, ui_layout FROM users WHERE id = ?`, uid,
-	).Scan(&theme, &layout)
+		`SELECT ui_theme, ui_layout, ui_density FROM users WHERE id = ?`, uid,
+	).Scan(&theme, &layout, &density)
 	if err != nil {
 		return p
 	}
@@ -123,6 +124,9 @@ func (s *Server) readPrefs(r *http.Request) userPrefs {
 	}
 	if layout == "wide" {
 		p.Layout = "wide"
+	}
+	if density == "compact" {
+		p.Density = "compact"
 	}
 	return p
 }
@@ -928,9 +932,13 @@ func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("full_width") != "" {
 		layout = "wide"
 	}
+	density := "standard"
+	if r.FormValue("density") == "compact" {
+		density = "compact"
+	}
 	if _, err := s.db.Exec(
-		`UPDATE users SET ui_theme = ?, ui_layout = ? WHERE id = ?`,
-		theme, layout, uid,
+		`UPDATE users SET ui_theme = ?, ui_layout = ?, ui_density = ? WHERE id = ?`,
+		theme, layout, density, uid,
 	); err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return

@@ -1,6 +1,6 @@
 {{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
 {{define "layout"}}<!doctype html>
-<html lang="en" data-theme="{{.Prefs.Theme}}" data-layout="{{.Prefs.Layout}}">
+<html lang="en" data-theme="{{.Prefs.Theme}}" data-layout="{{.Prefs.Layout}}" data-density="{{.Prefs.Density}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

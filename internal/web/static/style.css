@@ -152,6 +152,7 @@ header {
   background: var(--header-bg); color: var(--header-fg);
   padding: 0.75rem 1.25rem;
   border-bottom: 1px solid var(--header-border);
+  position: sticky; top: 0; z-index: 100;
 }
 header nav {
   display: flex; align-items: center; gap: 1.25rem;
@@ -336,3 +337,35 @@ td.tag-cell { max-width: 200px; }
 
 .settings-form { max-width: 500px; }
 .settings-form .field-help { font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
+
+/* --- row view/edit toggle ---------------------------------------------- */
+tr.host-row .edit-only { display: none; }
+tr.host-row.editing .view-only { display: none; }
+tr.host-row.editing input.edit-only,
+tr.host-row.editing button.edit-only { display: inline-block; }
+tr.host-row .view-only { white-space: pre-wrap; word-break: break-word; }
+
+/* --- compact density --------------------------------------------------- */
+[data-density="compact"] header { padding: 0.3rem 1.25rem; }
+[data-density="compact"] header nav { gap: 0.9rem; }
+[data-density="compact"] main { margin: 1rem auto; padding: 1rem 1.25rem; }
+[data-density="compact"][data-layout="wide"] main { margin: 0; padding: 0.75rem 1rem; }
+[data-density="compact"] h1 { font-size: 1.3rem; }
+[data-density="compact"] h2 { font-size: 1.05rem; margin-top: 1rem; }
+[data-density="compact"] .subnet-header { gap: 0.5rem; margin-bottom: 0.5rem; }
+[data-density="compact"] .cards { gap: 0.5rem; margin-bottom: 0.8rem; }
+[data-density="compact"] .card { padding: 0.55rem 0.85rem; }
+[data-density="compact"] .card-num { font-size: 1.4rem; }
+[data-density="compact"] .card-label { font-size: 0.7rem; margin-top: 0.15rem; }
+[data-density="compact"] form.inline-form { margin-bottom: 0.8rem; }
+[data-density="compact"] form.inline-form.edit-meta { padding: 0.5rem; }
+[data-density="compact"] table th,
+[data-density="compact"] table td { padding: 0.3rem 0.55rem; }
+[data-density="compact"] table.hosts-table td { padding: 0.15rem 0.45rem; }
+[data-density="compact"] table.hosts-table input { padding: 0.2rem 0.4rem; font-size: 0.85rem; }
+[data-density="compact"] table.hosts-table button { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
+[data-density="compact"] .bulk-bar { padding: 0.35rem 0.6rem; font-size: 0.85rem; }
+[data-density="compact"] .toolbar { margin: 0.6rem 0 0.3rem; }
+[data-density="compact"] .toolbar input[type=text] { padding: 0.3rem 0.5rem; }
+[data-density="compact"] dl.host-facts { padding: 0.6rem 0.8rem; margin: 0.75rem 0 1rem; gap: 0.25rem 1rem; }
+[data-density="compact"] .flash, [data-density="compact"] .info { padding: 0.5rem 0.75rem; }
