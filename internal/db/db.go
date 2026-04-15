@@ -17,6 +17,8 @@ var alters = []string{
 	`ALTER TABLE subnets ADD COLUMN last_scan_at INTEGER`,
 	`ALTER TABLE subnets ADD COLUMN last_scan_err TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE hosts ADD COLUMN tags TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE users ADD COLUMN ui_theme TEXT NOT NULL DEFAULT 'light'`,
+	`ALTER TABLE users ADD COLUMN ui_layout TEXT NOT NULL DEFAULT 'normal'`,
 }
 
 func Open(path string) (*sql.DB, error) {

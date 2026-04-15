@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS users (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,
     username      TEXT    NOT NULL UNIQUE,
     password_hash TEXT    NOT NULL,
+    ui_theme      TEXT    NOT NULL DEFAULT 'light',
+    ui_layout     TEXT    NOT NULL DEFAULT 'normal',
     created_at    INTEGER NOT NULL
 );
 

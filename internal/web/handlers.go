@@ -95,13 +95,28 @@ type pageData struct {
 	CSRF   string
 }
 
-func readPrefs(r *http.Request) userPrefs {
+// readPrefs loads UI preferences for the authenticated user from the DB.
+// Unauthenticated requests (e.g. login/setup pages) get defaults so the
+// preference is a per-account property that follows the user across
+// browsers and machines.
+func (s *Server) readPrefs(r *http.Request) userPrefs {
 	p := userPrefs{Theme: "light", Layout: "normal"}
-	if c, err := r.Cookie("theme"); err == nil && (c.Value == "dark" || c.Value == "light") {
-		p.Theme = c.Value
+	uid, ok := r.Context().Value(userIDKey).(int64)
+	if !ok || uid == 0 {
+		return p
 	}
-	if c, err := r.Cookie("layout"); err == nil && (c.Value == "wide" || c.Value == "normal") {
-		p.Layout = c.Value
+	var theme, layout string
+	err := s.db.QueryRow(
+		`SELECT ui_theme, ui_layout FROM users WHERE id = ?`, uid,
+	).Scan(&theme, &layout)
+	if err != nil {
+		return p
+	}
+	if theme == "dark" {
+		p.Theme = "dark"
+	}
+	if layout == "wide" {
+		p.Layout = "wide"
 	}
 	return p
 }
@@ -112,7 +127,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 		http.Error(w, "template not found", http.StatusInternalServerError)
 		return
 	}
-	data.Prefs = readPrefs(r)
+	data.Prefs = s.readPrefs(r)
 	data.CSRF = s.ensureCSRFCookie(w, r)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
@@ -889,6 +904,11 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
+	uid, ok := r.Context().Value(userIDKey).(int64)
+	if !ok || uid == 0 {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
 	theme := "light"
 	if r.FormValue("theme") == "dark" {
 		theme = "dark"
@@ -897,16 +917,17 @@ func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
 	if r.FormValue("full_width") != "" {
 		layout = "wide"
 	}
-	const oneYear = 365 * 24 * 3600
-	secure := isHTTPS(r, s.trustProxy)
-	http.SetCookie(w, &http.Cookie{
-		Name: "theme", Value: theme, Path: "/",
-		MaxAge: oneYear, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure,
-	})
-	http.SetCookie(w, &http.Cookie{
-		Name: "layout", Value: layout, Path: "/",
-		MaxAge: oneYear, HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure,
-	})
+	if _, err := s.db.Exec(
+		`UPDATE users SET ui_theme = ?, ui_layout = ? WHERE id = ?`,
+		theme, layout, uid,
+	); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	// Remove any stale pre-DB prefs cookie so the browser stops carrying them.
+	for _, n := range []string{"theme", "layout"} {
+		http.SetCookie(w, &http.Cookie{Name: n, Value: "", Path: "/", MaxAge: -1})
+	}
 	http.Redirect(w, r, "/settings?saved=1", http.StatusSeeOther)
 }
 
