@@ -149,6 +149,44 @@ Key compose bits:
 - Flags are passed as `command:` entries; uncomment `-setup-token=…`,
   `-trust-proxy`, or `-event-retention-days=…` as needed.
 
+### Portainer + ipvlan
+
+If you run containers on a Portainer-managed ipvlan network (each container
+gets its own LAN IP), swap `network_mode: host` for an explicit network
+reference. `-trust-proxy` is unnecessary — the container sees real client
+IPs directly. No `ports:` mapping is needed; the container is reachable at
+`<container-lan-ip>:8080`.
+
+```yaml
+services:
+  ipamthing:
+    image: ipamthing:latest
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW
+    volumes:
+      - ipamthing-data:/var/lib/ipamthing
+    command:
+      - -addr=:8080
+      - -db=/var/lib/ipamthing/ipamthing.db
+    networks:
+      lan:
+        # optional; omit to let the ipvlan IPAM assign one
+        ipv4_address: 10.0.0.42
+
+networks:
+  lan:
+    external: true          # created out-of-band (Portainer → Networks)
+    name: lan               # replace with your actual network name
+
+volumes:
+  ipamthing-data:
+```
+
+Note the L2-ipvlan gotcha: the Docker host itself can't reach the
+container's LAN IP (parent/child isolation). Browse from a different
+machine on the LAN, or use Portainer's built-in container terminal / logs.
+
 To bypass compose and run directly:
 
 ```
