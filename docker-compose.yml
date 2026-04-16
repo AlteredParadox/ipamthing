@@ -1,0 +1,29 @@
+services:
+  ipamthing:
+    build: .
+    image: ipamthing:latest
+    container_name: ipamthing
+    restart: unless-stopped
+
+    # host networking so scans see the real LAN and per-IP rate limiting sees
+    # real client IPs. If you swap this for a bridge network, set
+    # "-trust-proxy" in command and front ipamthing with a reverse proxy.
+    network_mode: host
+
+    # Allow raw ICMP without running as root. The app's "ipamthing" user
+    # inside the container inherits NET_RAW via AmbientCapabilities.
+    cap_add:
+      - NET_RAW
+
+    volumes:
+      - ipamthing-data:/var/lib/ipamthing
+
+    command:
+      - -addr=:8080
+      - -db=/var/lib/ipamthing/ipamthing.db
+      # - -event-retention-days=90       # (default)
+      # - -trust-proxy                   # enable when behind nginx / NPM
+      # - -setup-token=change-me         # set on first run; otherwise check logs
+
+volumes:
+  ipamthing-data:

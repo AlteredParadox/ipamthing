@@ -1,0 +1,12 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+docker-compose.yml
+README.md
+*.db
+*.db-wal
+*.db-shm
+ipamthing
+ipamthing-linux-amd64
+ipamthing-linux-arm64

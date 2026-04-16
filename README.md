@@ -126,6 +126,39 @@ sudo systemctl status ipamthing
 just enough to open raw ICMP sockets; `NoNewPrivileges` + `ProtectSystem`
 + `ProtectHome` + `ReadWritePaths` keep the blast radius tight.
 
+## Docker
+
+A multi-stage Dockerfile and a `docker-compose.yml` are included. The
+runtime image is `alpine:3.20 + iproute2 + ipamthing` (~20 MB) running as
+the unprivileged `ipamthing` user.
+
+```
+docker compose up -d --build
+docker compose logs ipamthing        # read the first-run setup token
+```
+
+The compose file uses **host networking** so the scanner sees the real LAN
+and per-IP rate limiting sees real client addresses. If you'd rather run on
+a bridge network behind a reverse proxy, remove `network_mode: host` and add
+`-trust-proxy` to the `command:`.
+
+Key compose bits:
+
+- `cap_add: - NET_RAW` — raw ICMP sockets work without running as root.
+- Persistent `ipamthing-data` volume mounted at `/var/lib/ipamthing`.
+- Flags are passed as `command:` entries; uncomment `-setup-token=…`,
+  `-trust-proxy`, or `-event-retention-days=…` as needed.
+
+To bypass compose and run directly:
+
+```
+docker build -t ipamthing:latest .
+docker run -d --name ipamthing \
+  --network host --cap-add NET_RAW \
+  -v ipamthing-data:/var/lib/ipamthing \
+  ipamthing:latest
+```
+
 ### 4. Upgrading
 
 ```
