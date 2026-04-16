@@ -149,13 +149,13 @@ Key compose bits:
 - Flags are passed as `command:` entries; uncomment `-setup-token=…`,
   `-trust-proxy`, or `-event-retention-days=…` as needed.
 
-### Portainer + ipvlan
+### Portainer + macvlan / ipvlan
 
-If you run containers on a Portainer-managed ipvlan network (each container
-gets its own LAN IP), swap `network_mode: host` for an explicit network
-reference. `-trust-proxy` is unnecessary — the container sees real client
-IPs directly. No `ports:` mapping is needed; the container is reachable at
-`<container-lan-ip>:8080`.
+If you run containers on a Portainer-managed macvlan (or ipvlan) network
+so each container gets its own LAN IP, swap `network_mode: host` for an
+explicit network reference. `-trust-proxy` is unnecessary — the container
+sees real client IPs directly. No `ports:` mapping is needed; the
+container is reachable at `<container-lan-ip>:8080`.
 
 ```yaml
 services:
@@ -183,7 +183,7 @@ volumes:
   ipamthing-data:
 ```
 
-Note the L2-ipvlan gotcha: the Docker host itself can't reach the
+Note the macvlan / ipvlan gotcha: the Docker host itself can't reach the
 container's LAN IP (parent/child isolation). Browse from a different
 machine on the LAN, or use Portainer's built-in container terminal / logs.
 
