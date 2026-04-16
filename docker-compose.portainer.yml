@@ -1,0 +1,40 @@
+# Portainer stack compose, attached to an existing macvlan (or ipvlan)
+# network so ipamthing gets its own IP on the LAN.
+#
+# Before deploying: create the macvlan network in Portainer
+#   (Networks → Add network → Driver: macvlan) and note its name.
+# Set the MACVLAN_NETWORK environment variable in the stack deploy form
+# (or edit the default below).
+
+services:
+  ipamthing:
+    build: .
+    image: ipamthing:latest
+    container_name: ipamthing
+    restart: unless-stopped
+
+    cap_add:
+      - NET_RAW
+
+    volumes:
+      - ipamthing-data:/var/lib/ipamthing
+
+    command:
+      - -addr=:8080
+      - -db=/var/lib/ipamthing/ipamthing.db
+      # - -event-retention-days=90     # (default)
+      # - -setup-token=change-me       # paste a value to skip the auto-generated one
+
+    networks:
+      lan: {}
+      # To pin a static IP, replace the empty mapping above with:
+      #   lan:
+      #     ipv4_address: 10.0.0.42
+
+networks:
+  lan:
+    external: true
+    name: ${MACVLAN_NETWORK:-lan}
+
+volumes:
+  ipamthing-data:

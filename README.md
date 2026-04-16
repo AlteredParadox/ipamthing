@@ -157,31 +157,15 @@ explicit network reference. `-trust-proxy` is unnecessary — the container
 sees real client IPs directly. No `ports:` mapping is needed; the
 container is reachable at `<container-lan-ip>:8080`.
 
-```yaml
-services:
-  ipamthing:
-    image: ipamthing:latest
-    restart: unless-stopped
-    cap_add:
-      - NET_RAW
-    volumes:
-      - ipamthing-data:/var/lib/ipamthing
-    command:
-      - -addr=:8080
-      - -db=/var/lib/ipamthing/ipamthing.db
-    networks:
-      lan:
-        # optional; omit to let the ipvlan IPAM assign one
-        ipv4_address: 10.0.0.42
+A ready-made variant lives at `docker-compose.portainer.yml` in the repo.
+Point Portainer's "Compose path" at that file when creating the stack, and
+set the stack env var `MACVLAN_NETWORK` to the name of your pre-created
+macvlan network.
 
-networks:
-  lan:
-    external: true          # created out-of-band (Portainer → Networks)
-    name: lan               # replace with your actual network name
-
-volumes:
-  ipamthing-data:
-```
+For a Git-backed Portainer stack: Stacks → Add stack → Repository →
+`ssh://git@<gitea-host>:<port>/<user>/ipamthing.git`, reference
+`refs/heads/main`, compose path `docker-compose.portainer.yml`. Enable
+GitOps updates (poll or webhook) for auto-redeploy on push.
 
 Note the macvlan / ipvlan gotcha: the Docker host itself can't reach the
 container's LAN IP (parent/child isolation). Browse from a different
