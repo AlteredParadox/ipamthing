@@ -3,8 +3,10 @@
 #
 # Before deploying: create the macvlan network in Portainer
 #   (Networks → Add network → Driver: macvlan) and note its name.
-# Set the MACVLAN_NETWORK environment variable in the stack deploy form
-# (or edit the default below).
+# Stack env vars you can set in the Portainer deploy form:
+#   MACVLAN_NETWORK   – name of the network created above (default: lan)
+#   IPAMTHING_IP      – optional static IP for this container; omit to let
+#                       the network's IPAM pool pick one (e.g. 10.0.0.42)
 
 services:
   ipamthing:
@@ -26,10 +28,10 @@ services:
       # - -setup-token=change-me       # paste a value to skip the auto-generated one
 
     networks:
-      lan: {}
-      # To pin a static IP, replace the empty mapping above with:
-      #   lan:
-      #     ipv4_address: 10.0.0.42
+      lan:
+        # Empty/unset => IPAM pool assigns. Set IPAMTHING_IP stack env to
+        # pin a specific LAN IP (e.g. IPAMTHING_IP=10.0.0.42).
+        ipv4_address: ${IPAMTHING_IP:-}
 
 networks:
   lan:

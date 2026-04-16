@@ -158,9 +158,12 @@ sees real client IPs directly. No `ports:` mapping is needed; the
 container is reachable at `<container-lan-ip>:8080`.
 
 A ready-made variant lives at `docker-compose.portainer.yml` in the repo.
-Point Portainer's "Compose path" at that file when creating the stack, and
-set the stack env var `MACVLAN_NETWORK` to the name of your pre-created
-macvlan network.
+Point Portainer's "Compose path" at that file when creating the stack and
+set these stack environment variables:
+
+- `MACVLAN_NETWORK` — name of your pre-created macvlan network (default: `lan`).
+- `IPAMTHING_IP` — optional static LAN IP for the container; leave unset
+  to let the network's IPAM pool assign one.
 
 For a Git-backed Portainer stack: Stacks → Add stack → Repository →
 `ssh://git@<gitea-host>:<port>/<user>/ipamthing.git`, reference
