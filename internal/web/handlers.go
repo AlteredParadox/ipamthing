@@ -301,7 +301,10 @@ func (s *Server) postLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(auth.SessionCookieName); err == nil {
 		_ = s.sessions.Delete(c.Value)
 	}
-	http.SetCookie(w, &http.Cookie{Name: auth.SessionCookieName, Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{
+		Name: auth.SessionCookieName, Value: "", Path: "/", MaxAge: -1,
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: isHTTPS(r, s.trustProxy),
+	})
 	http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 }
 
@@ -378,6 +381,11 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		sr.ScanEnabled = enabled != 0
 		d.Subnets = append(d.Subnets, sr)
 	}
+	if err := srows.Err(); err != nil {
+		srows.Close()
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
+	}
 	srows.Close()
 
 	erows, err := s.db.Query(`
@@ -407,6 +415,11 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 			e.EffectiveHostname = dns
 		}
 		d.RecentEvents = append(d.RecentEvents, e)
+	}
+	if err := erows.Err(); err != nil {
+		erows.Close()
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
 	}
 	erows.Close()
 
@@ -446,6 +459,10 @@ func (s *Server) listSubnets(w http.ResponseWriter, r *http.Request) {
 		}
 		sr.ScanEnabled = enabled != 0
 		subnets = append(subnets, sr)
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
 	}
 
 	flash := ""
@@ -616,6 +633,10 @@ func (s *Server) viewSubnet(w http.ResponseWriter, r *http.Request) {
 		}
 		hosts = append(hosts, h)
 	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
+	}
 	sort.Slice(hosts, func(i, j int) bool {
 		ai, _ := netip.ParseAddr(hosts[i].IP)
 		bj, _ := netip.ParseAddr(hosts[j].IP)
@@ -715,6 +736,10 @@ func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
 		}
 		events = append(events, e)
 	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
+	}
 
 	title := h.IP
 	if h.HostnameOverride != "" {
@@ -793,6 +818,10 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		}
 		events = append(events, e)
 	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
+	}
 
 	hasMore := len(events) > limit
 	var nextCursor int64
@@ -845,6 +874,10 @@ func (s *Server) exportSubnet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		hosts = append(hosts, h)
+	}
+	if err := rows.Err(); err != nil {
+		http.Error(w, msgDBError, http.StatusInternalServerError)
+		return
 	}
 	sort.Slice(hosts, func(i, j int) bool {
 		a, _ := netip.ParseAddr(hosts[i].IP)
@@ -909,6 +942,9 @@ func (s *Server) exportEvents(w http.ResponseWriter, r *http.Request) {
 			cidr, ip, hn, event, details,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		s.logger.Error("exportEvents rows", "err", err)
+	}
 	cw.Flush()
 }
 
@@ -953,8 +989,12 @@ func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Remove any stale pre-DB prefs cookie so the browser stops carrying them.
+	secure := isHTTPS(r, s.trustProxy)
 	for _, n := range []string{"theme", "layout"} {
-		http.SetCookie(w, &http.Cookie{Name: n, Value: "", Path: "/", MaxAge: -1})
+		http.SetCookie(w, &http.Cookie{
+			Name: n, Value: "", Path: "/", MaxAge: -1,
+			HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secure,
+		})
 	}
 	http.Redirect(w, r, "/settings?saved=1", http.StatusSeeOther)
 }

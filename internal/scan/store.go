@@ -67,6 +67,9 @@ func loadExistingHosts(ctx context.Context, tx *sql.Tx, subnetID int64) (map[str
 		}
 		ex[ip] = e
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 	return ex, nil
 }
 

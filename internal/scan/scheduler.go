@@ -63,6 +63,9 @@ func (s *Scheduler) pass(ctx context.Context) {
 			ids = append(ids, id)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		s.logger.Error("scheduler pass rows", "err", err)
+	}
 	rows.Close()
 	for _, id := range ids {
 		if ctx.Err() != nil {
