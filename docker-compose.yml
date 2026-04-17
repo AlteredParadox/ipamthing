@@ -1,7 +1,6 @@
 services:
   ipamthing:
     build: .
-    image: ipamthing:latest
     container_name: ipamthing
     restart: unless-stopped
 
