@@ -8,6 +8,11 @@ import (
 	"testing"
 )
 
+const (
+	testActionPath  = "/action"
+	testFormContent = "application/x-www-form-urlencoded"
+)
+
 func okHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -62,8 +67,8 @@ func TestCSRFBlocksPOSTWithoutToken(t *testing.T) {
 	s := &Server{}
 	handler := s.csrf(okHandler())
 
-	req := httptest.NewRequest("POST", "/action", strings.NewReader("x=1"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req := httptest.NewRequest("POST", testActionPath, strings.NewReader("x=1"))
+	req.Header.Set(headerContentType, testFormContent)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
@@ -76,9 +81,9 @@ func TestCSRFBlocksMismatchedToken(t *testing.T) {
 	s := &Server{}
 	handler := s.csrf(okHandler())
 
-	req := httptest.NewRequest("POST", "/action",
+	req := httptest.NewRequest("POST", testActionPath,
 		strings.NewReader("csrf_token=wrong-value"))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set(headerContentType, testFormContent)
 	req.AddCookie(&http.Cookie{Name: "csrf", Value: "correct-value"})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -93,9 +98,9 @@ func TestCSRFAcceptsMatchingToken(t *testing.T) {
 	handler := s.csrf(okHandler())
 
 	token := "a]b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
-	req := httptest.NewRequest("POST", "/action",
+	req := httptest.NewRequest("POST", testActionPath,
 		strings.NewReader("csrf_token="+token))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set(headerContentType, testFormContent)
 	req.AddCookie(&http.Cookie{Name: "csrf", Value: token})
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)

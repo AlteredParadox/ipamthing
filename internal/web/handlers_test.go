@@ -5,21 +5,28 @@ import (
 	"testing"
 )
 
+const (
+	testFallback   = "/default"
+	testRemoteAddr = "192.168.1.10:45678"
+	testClientIP   = "10.0.0.1"
+	testOrigin     = "http://example.com/"
+)
+
 func TestSafeRedirect(t *testing.T) {
 	cases := []struct {
 		target   string
 		fallback string
 		want     string
 	}{
-		{"", "/default", "/default"},
-		{"/subnets", "/default", "/subnets"},
-		{"/subnets/1", "/default", "/subnets/1"},
-		{"/hosts/42?tab=events", "/default", "/hosts/42?tab=events"},
-		{"https://evil.example/", "/default", "/default"},
-		{"//evil.example/", "/default", "/default"},
-		{`/\evil.example`, "/default", "/default"},
-		{"evil.example", "/default", "/default"},
-		{"javascript:alert(1)", "/default", "/default"},
+		{"", testFallback, testFallback},
+		{"/subnets", testFallback, "/subnets"},
+		{"/subnets/1", testFallback, "/subnets/1"},
+		{"/hosts/42?tab=events", testFallback, "/hosts/42?tab=events"},
+		{"https://evil.example/", testFallback, testFallback},
+		{"//evil.example/", testFallback, testFallback},
+		{`/\evil.example`, testFallback, testFallback},
+		{"evil.example", testFallback, testFallback},
+		{"javascript:alert(1)", testFallback, testFallback},
 	}
 	for _, c := range cases {
 		got := safeRedirect(c.target, c.fallback)
@@ -88,11 +95,11 @@ func TestClientIP(t *testing.T) {
 		trustProxy bool
 		want       string
 	}{
-		{"direct", "192.168.1.10:45678", "", false, "192.168.1.10"},
-		{"xff ignored without trust", "192.168.1.10:45678", "10.0.0.1", false, "192.168.1.10"},
-		{"xff single with trust", "192.168.1.10:45678", "10.0.0.1", true, "10.0.0.1"},
-		{"xff rightmost with trust", "192.168.1.10:45678", "spoof, 10.0.0.99", true, "10.0.0.99"},
-		{"xff rightmost trimmed", "192.168.1.10:45678", "spoof , 10.0.0.99 ", true, "10.0.0.99"},
+		{"direct", testRemoteAddr, "", false, "192.168.1.10"},
+		{"xff ignored without trust", testRemoteAddr, testClientIP, false, "192.168.1.10"},
+		{"xff single with trust", testRemoteAddr, testClientIP, true, testClientIP},
+		{"xff rightmost with trust", testRemoteAddr, "spoof, 10.0.0.99", true, "10.0.0.99"},
+		{"xff rightmost trimmed", testRemoteAddr, "spoof , 10.0.0.99 ", true, "10.0.0.99"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -111,20 +118,20 @@ func TestClientIP(t *testing.T) {
 
 func TestIsHTTPS(t *testing.T) {
 	t.Run("plain http", func(t *testing.T) {
-		r, _ := http.NewRequest("GET", "http://example.com/", nil)
+		r, _ := http.NewRequest("GET", testOrigin, nil)
 		if isHTTPS(r, false) {
 			t.Error("should be false for plain HTTP")
 		}
 	})
 	t.Run("xff proto without trust", func(t *testing.T) {
-		r, _ := http.NewRequest("GET", "http://example.com/", nil)
+		r, _ := http.NewRequest("GET", testOrigin, nil)
 		r.Header.Set("X-Forwarded-Proto", "https")
 		if isHTTPS(r, false) {
 			t.Error("should be false without trustProxy")
 		}
 	})
 	t.Run("xff proto with trust", func(t *testing.T) {
-		r, _ := http.NewRequest("GET", "http://example.com/", nil)
+		r, _ := http.NewRequest("GET", testOrigin, nil)
 		r.Header.Set("X-Forwarded-Proto", "https")
 		if !isHTTPS(r, true) {
 			t.Error("should be true with trustProxy and X-Forwarded-Proto: https")

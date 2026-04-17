@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const testIP = "10.0.0.1"
+
 func TestLoginLimiterAllowsUnderThreshold(t *testing.T) {
 	l := NewLoginLimiter(3, time.Minute, time.Minute)
 	for i := 0; i < 3; i++ {
@@ -19,9 +21,9 @@ func TestLoginLimiterAllowsUnderThreshold(t *testing.T) {
 func TestLoginLimiterLocksOut(t *testing.T) {
 	l := NewLoginLimiter(3, time.Minute, time.Minute)
 	for i := 0; i < 3; i++ {
-		l.Fail("10.0.0.1")
+		l.Fail(testIP)
 	}
-	ok, retryAfter := l.Allow("10.0.0.1")
+	ok, retryAfter := l.Allow(testIP)
 	if ok {
 		t.Fatal("should be locked out after 3 failures")
 	}
@@ -32,11 +34,11 @@ func TestLoginLimiterLocksOut(t *testing.T) {
 
 func TestLoginLimiterSuccessResets(t *testing.T) {
 	l := NewLoginLimiter(3, time.Minute, time.Minute)
-	l.Fail("10.0.0.1")
-	l.Fail("10.0.0.1")
-	l.Success("10.0.0.1")
+	l.Fail(testIP)
+	l.Fail(testIP)
+	l.Success(testIP)
 
-	ok, _ := l.Allow("10.0.0.1")
+	ok, _ := l.Allow(testIP)
 	if !ok {
 		t.Fatal("should be allowed after Success resets the counter")
 	}
@@ -44,8 +46,8 @@ func TestLoginLimiterSuccessResets(t *testing.T) {
 
 func TestLoginLimiterIsolatesKeys(t *testing.T) {
 	l := NewLoginLimiter(2, time.Minute, time.Minute)
-	l.Fail("10.0.0.1")
-	l.Fail("10.0.0.1")
+	l.Fail(testIP)
+	l.Fail(testIP)
 
 	ok, _ := l.Allow("10.0.0.2")
 	if !ok {
@@ -55,11 +57,11 @@ func TestLoginLimiterIsolatesKeys(t *testing.T) {
 
 func TestLoginLimiterWindowExpiry(t *testing.T) {
 	l := NewLoginLimiter(3, 1*time.Millisecond, time.Minute)
-	l.Fail("10.0.0.1")
-	l.Fail("10.0.0.1")
+	l.Fail(testIP)
+	l.Fail(testIP)
 	time.Sleep(5 * time.Millisecond)
 
-	ok, _ := l.Allow("10.0.0.1")
+	ok, _ := l.Allow(testIP)
 	if !ok {
 		t.Fatal("should be allowed after window expires")
 	}
