@@ -17,6 +17,25 @@ Simple, low-dependency web-based IPAM tool. Go + SQLite, single static binary.
 - Manual scan and continuous background monitoring
 - Basic username/password login
 
+## CI / SonarQube
+
+A Gitea Actions workflow at `.gitea/workflows/ci.yml` runs on every push
+to `main`: tests with coverage, build verification, and a SonarQube scan.
+
+**Setup:**
+
+1. Deploy a Gitea Actions runner (see `runner-compose.yml` for a
+   ready-made compose file). Register it via Gitea → Site Administration
+   → Runners.
+2. Add two **repo secrets** in Gitea (repo → Settings → Secrets):
+   - `SONAR_TOKEN` — a SonarQube user token (Administration → Security → Generate Tokens)
+   - `SONAR_HOST_URL` — e.g. `http://10.11.0.5:9000`
+3. Push to `main` — the workflow runs automatically. Results appear in
+   the repo's Actions tab and in SonarQube's project dashboard.
+
+To run locally without CI: `make sonar` (requires `sonar-scanner` on
+PATH and the same env vars exported).
+
 ## Flags
 
 - `-addr` — HTTP listen address (default `:8080`)

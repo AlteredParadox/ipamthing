@@ -1,0 +1,24 @@
+# Gitea Actions runner — deploy alongside your Gitea instance.
+#
+# Setup steps:
+#   1. In Gitea: Site Administration → Runners → Create new runner
+#      Copy the registration token.
+#   2. Set GITEA_INSTANCE_URL and GITEA_RUNNER_REGISTRATION_TOKEN below
+#      (or use env vars / .env file).
+#   3. docker compose -f runner-compose.yml up -d
+#
+# The runner picks up jobs from .gitea/workflows/*.yml in any repo on
+# the instance. It uses Docker-in-Docker to run each job in an isolated
+# container.
+
+services:
+  runner:
+    image: gitea/act_runner:latest
+    restart: unless-stopped
+    environment:
+      GITEA_INSTANCE_URL: ${GITEA_INSTANCE_URL:-http://192.0.2.10:3000}
+      GITEA_RUNNER_REGISTRATION_TOKEN: ${GITEA_RUNNER_REGISTRATION_TOKEN}
+      GITEA_RUNNER_NAME: ipamthing-runner
+    volumes:
+      - runner-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock
