@@ -190,12 +190,22 @@ func (f *icmpFamily) readReplies(ctx context.Context, timeout time.Duration, res
 	buf := make([]byte, 1500)
 	deadline := time.Now().Add(timeout)
 	for {
-		if ctx.Err() != nil {
+		n, peer, ok := f.readOnePacket(ctx, deadline, buf)
+		if !ok {
 			break
+		}
+		f.handleReply(peer, buf[:n], proto, expected, responses)
+	}
+}
+
+func (f *icmpFamily) readOnePacket(ctx context.Context, deadline time.Time, buf []byte) (int, net.Addr, bool) {
+	for {
+		if ctx.Err() != nil {
+			return 0, nil, false
 		}
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
-			break
+			return 0, nil, false
 		}
 		if remaining > 100*time.Millisecond {
 			remaining = 100 * time.Millisecond
@@ -206,13 +216,20 @@ func (f *icmpFamily) readReplies(ctx context.Context, timeout time.Duration, res
 			if isTimeout(err) {
 				continue
 			}
-			break
+			return 0, nil, false
 		}
-		if addr, ok := parseReplyAddr(peer, f.v6); ok {
-			if msg, err := icmp.ParseMessage(proto, buf[:n]); err == nil && msg.Type == expected {
-				responses[addr] = true
-			}
-		}
+		return n, peer, true
+	}
+}
+
+func (f *icmpFamily) handleReply(peer net.Addr, pkt []byte, proto int, expected icmp.Type, responses map[netip.Addr]bool) {
+	addr, ok := parseReplyAddr(peer, f.v6)
+	if !ok {
+		return
+	}
+	msg, err := icmp.ParseMessage(proto, pkt)
+	if err == nil && msg.Type == expected {
+		responses[addr] = true
 	}
 }
 
