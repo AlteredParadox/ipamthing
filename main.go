@@ -103,7 +103,16 @@ func main() {
 		}
 	}
 
-	handler := web.NewRouter(logger, database, sessions, loginLimiter, scanner, scheduler, setupToken, *trustProxy)
+	handler := web.NewRouter(web.ServerDeps{
+		Logger:       logger,
+		DB:           database,
+		Sessions:     sessions,
+		LoginLimiter: loginLimiter,
+		Scanner:      scanner,
+		Scheduler:    scheduler,
+		SetupToken:   setupToken,
+		TrustProxy:   *trustProxy,
+	})
 
 	srv := &http.Server{
 		Addr:              *addr,

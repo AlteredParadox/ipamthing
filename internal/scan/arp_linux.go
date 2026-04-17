@@ -26,33 +26,40 @@ func readIPNeigh() (map[string]string, error) {
 	}
 	m := make(map[string]string)
 	for _, line := range strings.Split(string(out), "\n") {
-		f := strings.Fields(line)
-		if len(f) < 2 {
-			continue
-		}
-		ipStr := f[0]
-		var mac, state string
-		for i := 1; i < len(f); i++ {
-			switch f[i] {
-			case "lladdr":
-				if i+1 < len(f) {
-					mac = f[i+1]
-				}
-			case "REACHABLE", "STALE", "DELAY", "PROBE", "PERMANENT", "NOARP", "FAILED", "INCOMPLETE":
-				state = f[i]
-			}
-		}
-		if mac == "" || mac == "00:00:00:00:00:00" {
-			continue
-		}
-		if state == "FAILED" || state == "INCOMPLETE" {
-			continue
-		}
-		if a, err := netip.ParseAddr(ipStr); err == nil {
-			m[a.Unmap().String()] = mac
+		if ip, mac, ok := parseNeighLine(line); ok {
+			m[ip] = mac
 		}
 	}
 	return m, nil
+}
+
+func parseNeighLine(line string) (ip, mac string, ok bool) {
+	f := strings.Fields(line)
+	if len(f) < 2 {
+		return "", "", false
+	}
+	var macAddr, state string
+	for i := 1; i < len(f); i++ {
+		switch f[i] {
+		case "lladdr":
+			if i+1 < len(f) {
+				macAddr = f[i+1]
+			}
+		case "REACHABLE", "STALE", "DELAY", "PROBE", "PERMANENT", "NOARP", "FAILED", "INCOMPLETE":
+			state = f[i]
+		}
+	}
+	if macAddr == "" || macAddr == "00:00:00:00:00:00" {
+		return "", "", false
+	}
+	if state == "FAILED" || state == "INCOMPLETE" {
+		return "", "", false
+	}
+	a, err := netip.ParseAddr(f[0])
+	if err != nil {
+		return "", "", false
+	}
+	return a.Unmap().String(), macAddr, true
 }
 
 func readProcArp() (map[string]string, error) {
@@ -61,20 +68,13 @@ func readProcArp() (map[string]string, error) {
 		return nil, err
 	}
 	m := make(map[string]string)
-	lines := strings.Split(string(data), "\n")
-	for idx, ln := range lines {
-		if idx == 0 {
-			continue
-		}
+	for _, ln := range strings.Split(string(data), "\n")[1:] {
 		f := strings.Fields(ln)
 		if len(f) < 4 {
 			continue
 		}
 		ip, flags, mac := f[0], f[2], f[3]
-		if mac == "00:00:00:00:00:00" {
-			continue
-		}
-		if flags == "0x0" {
+		if mac == "00:00:00:00:00:00" || flags == "0x0" {
 			continue
 		}
 		m[ip] = mac

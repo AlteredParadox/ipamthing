@@ -133,33 +133,38 @@ func (f *icmpFamily) sweep(ctx context.Context, targets []netip.Addr, timeout ti
 	defer f.mu.Unlock()
 
 	responses := make(map[netip.Addr]bool)
-	buf := make([]byte, 1500)
+	f.drain()
+	f.sendEchoes(ctx, targets)
+	f.readReplies(ctx, timeout, responses)
+	return responses
+}
 
+func (f *icmpFamily) drain() {
+	buf := make([]byte, 1500)
 	_ = f.conn.SetReadDeadline(time.Now().Add(10 * time.Millisecond))
 	for {
 		if _, _, err := f.conn.ReadFrom(buf); err != nil {
 			break
 		}
 	}
+}
 
-	var msgType, expected icmp.Type
-	var proto int
+func (f *icmpFamily) sendEchoes(ctx context.Context, targets []netip.Addr) {
+	var msgType icmp.Type
 	if f.v6 {
-		msgType, expected, proto = ipv6.ICMPTypeEchoRequest, ipv6.ICMPTypeEchoReply, protoICMPv6
+		msgType = ipv6.ICMPTypeEchoRequest
 	} else {
-		msgType, expected, proto = ipv4.ICMPTypeEcho, ipv4.ICMPTypeEchoReply, protoICMPv4
+		msgType = ipv4.ICMPTypeEcho
 	}
-
 	id := os.Getpid() & 0xffff
 	for seq, target := range targets {
 		if ctx.Err() != nil {
-			return responses
+			return
 		}
-		msg := icmp.Message{
+		body, err := (&icmp.Message{
 			Type: msgType, Code: 0,
 			Body: &icmp.Echo{ID: id, Seq: seq, Data: []byte("ipamthing")},
-		}
-		body, err := msg.Marshal(nil)
+		}).Marshal(nil)
 		if err != nil {
 			continue
 		}
@@ -171,7 +176,18 @@ func (f *icmpFamily) sweep(ctx context.Context, targets []netip.Addr, timeout ti
 		}
 		_, _ = f.conn.WriteTo(body, dst)
 	}
+}
 
+func (f *icmpFamily) readReplies(ctx context.Context, timeout time.Duration, responses map[netip.Addr]bool) {
+	var expected icmp.Type
+	var proto int
+	if f.v6 {
+		expected, proto = ipv6.ICMPTypeEchoReply, protoICMPv6
+	} else {
+		expected, proto = ipv4.ICMPTypeEchoReply, protoICMPv4
+	}
+
+	buf := make([]byte, 1500)
 	deadline := time.Now().Add(timeout)
 	for {
 		if ctx.Err() != nil {
@@ -187,40 +203,45 @@ func (f *icmpFamily) sweep(ctx context.Context, targets []netip.Addr, timeout ti
 		_ = f.conn.SetReadDeadline(time.Now().Add(remaining))
 		n, peer, err := f.conn.ReadFrom(buf)
 		if err != nil {
-			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			if isTimeout(err) {
 				continue
 			}
 			break
 		}
-		var ipBytes []byte
-		switch p := peer.(type) {
-		case *net.UDPAddr:
-			ipBytes = p.IP
-		case *net.IPAddr:
-			ipBytes = p.IP
-		}
-		if len(ipBytes) == 0 {
-			continue
-		}
-		var addr netip.Addr
-		if !f.v6 {
-			if v4 := net.IP(ipBytes).To4(); v4 != nil {
-				ipBytes = v4
+		if addr, ok := parseReplyAddr(peer, f.v6); ok {
+			if msg, err := icmp.ParseMessage(proto, buf[:n]); err == nil && msg.Type == expected {
+				responses[addr] = true
 			}
 		}
-		a, ok := netip.AddrFromSlice(ipBytes)
-		if !ok {
-			continue
-		}
-		addr = a.Unmap()
-		msg, err := icmp.ParseMessage(proto, buf[:n])
-		if err != nil {
-			continue
-		}
-		if msg.Type != expected {
-			continue
-		}
-		responses[addr] = true
 	}
-	return responses
+}
+
+func parseReplyAddr(peer net.Addr, v6 bool) (netip.Addr, bool) {
+	var ipBytes []byte
+	switch p := peer.(type) {
+	case *net.UDPAddr:
+		ipBytes = p.IP
+	case *net.IPAddr:
+		ipBytes = p.IP
+	}
+	if len(ipBytes) == 0 {
+		return netip.Addr{}, false
+	}
+	if !v6 {
+		if v4 := net.IP(ipBytes).To4(); v4 != nil {
+			ipBytes = v4
+		}
+	}
+	a, ok := netip.AddrFromSlice(ipBytes)
+	if !ok {
+		return netip.Addr{}, false
+	}
+	return a.Unmap(), true
+}
+
+func isTimeout(err error) bool {
+	if ne, ok := err.(net.Error); ok {
+		return ne.Timeout()
+	}
+	return false
 }

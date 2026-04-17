@@ -26,6 +26,15 @@ const (
 	maxHostnameLen     = 253
 	maxCommentsLen     = 2000
 	maxTagsLen         = 512
+
+	headerContentType = "Content-Type"
+	pathLogin         = "/login"
+	pathSubnets       = "/subnets"
+	pathSubnetFmt     = "/subnets/%d"
+	titleSetup        = "Set up admin"
+	titleSignIn       = "Sign in"
+	msgDBError        = "db error"
+	msgScanError      = "scan error"
 )
 
 // truncate caps s at max bytes. If the cut lands mid-rune the trailing
@@ -139,7 +148,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 	}
 	data.Prefs = s.readPrefs(r)
 	data.CSRF = s.ensureCSRFCookie(w, r)
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set(headerContentType, "text/html; charset=utf-8")
 	if err := t.ExecuteTemplate(w, "layout", data); err != nil {
 		s.logger.Error("render", "page", page, "err", err)
 	}
@@ -179,10 +188,10 @@ func (s *Server) userCount() (int, error) {
 
 func (s *Server) getSetup(w http.ResponseWriter, r *http.Request) {
 	if n, _ := s.userCount(); n > 0 {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 		return
 	}
-	s.render(w, r, "setup", pageData{Title: "Set up admin"})
+	s.render(w, r, "setup", pageData{Title: titleSetup})
 }
 
 func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
@@ -193,21 +202,21 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 	defer s.setupMu.Unlock()
 
 	if n, _ := s.userCount(); n > 0 {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 		return
 	}
 
 	expected := s.setupToken
 	submitted := r.FormValue("setup_token")
 	if expected == "" || subtle.ConstantTimeCompare([]byte(submitted), []byte(expected)) != 1 {
-		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "invalid setup token — check the server logs or restart with -setup-token"})
+		s.render(w, r, "setup", pageData{Title: titleSetup, Flash: "invalid setup token — check the server logs or restart with -setup-token"})
 		return
 	}
 
 	username := truncate(r.FormValue("username"), maxUsernameLen)
 	password := r.FormValue("password")
 	if username == "" || len(password) < 8 {
-		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "username required and password must be 8+ chars"})
+		s.render(w, r, "setup", pageData{Title: titleSetup, Flash: "username required and password must be 8+ chars"})
 		return
 	}
 	hash, err := auth.HashPassword(password)
@@ -219,17 +228,17 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		`INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)`,
 		username, hash, time.Now().Unix(),
 	); err != nil {
-		s.render(w, r, "setup", pageData{Title: "Set up admin", Flash: "failed to create user"})
+		s.render(w, r, "setup", pageData{Title: titleSetup, Flash: "failed to create user"})
 		return
 	}
 
 	s.setupToken = ""
 	s.logger.Info("first-run setup completed; setup token consumed")
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 }
 
 func (s *Server) getLogin(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "login", pageData{Title: "Sign in"})
+	s.render(w, r, "login", pageData{Title: titleSignIn})
 }
 
 func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +246,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 	if allowed, retryAfter := s.loginLimiter.Allow(ip); !allowed {
 		w.Header().Set("Retry-After", strconv.Itoa(int(retryAfter.Seconds())+1))
 		flash := fmt.Sprintf("too many failed attempts — try again in %s", retryAfter.Round(time.Second))
-		s.render(w, r, "login", pageData{Title: "Sign in", Flash: flash})
+		s.render(w, r, "login", pageData{Title: titleSignIn, Flash: flash})
 		return
 	}
 
@@ -250,7 +259,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 		`SELECT id, password_hash FROM users WHERE username = ?`, username,
 	).Scan(&id, &hash)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	userFound := err == nil
@@ -261,7 +270,7 @@ func (s *Server) postLogin(w http.ResponseWriter, r *http.Request) {
 	passwordOK := auth.CheckPassword(hash, password)
 	if !userFound || !passwordOK {
 		s.loginLimiter.Fail(ip)
-		s.render(w, r, "login", pageData{Title: "Sign in", Flash: "invalid credentials"})
+		s.render(w, r, "login", pageData{Title: titleSignIn, Flash: "invalid credentials"})
 		return
 	}
 	s.loginLimiter.Success(ip)
@@ -293,7 +302,7 @@ func (s *Server) postLogout(w http.ResponseWriter, r *http.Request) {
 		_ = s.sessions.Delete(c.Value)
 	}
 	http.SetCookie(w, &http.Cookie{Name: auth.SessionCookieName, Value: "", Path: "/", MaxAge: -1})
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 }
 
 func (s *Server) getIndex(w http.ResponseWriter, r *http.Request) {
@@ -340,7 +349,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		       (SELECT COUNT(*) FROM hosts WHERE status='down'),
 		       (SELECT COUNT(*) FROM scan_events WHERE ts >= ?)
 	`, since).Scan(&d.Totals.Subnets, &d.Totals.Hosts, &d.Totals.Up, &d.Totals.Down, &d.Totals.Events24h); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 
@@ -354,7 +363,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		GROUP BY sn.id ORDER BY sn.cidr
 	`)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	for srows.Next() {
@@ -363,7 +372,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		if err := srows.Scan(&sr.ID, &sr.CIDR, &sr.Name, &enabled, &sr.ScanIntervalSec,
 			&sr.LastScanAt, &sr.LastScanErr, &sr.Hosts, &sr.Up); err != nil {
 			srows.Close()
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		sr.ScanEnabled = enabled != 0
@@ -380,7 +389,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		ORDER BY e.id DESC LIMIT 10
 	`)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	for erows.Next() {
@@ -389,7 +398,7 @@ func (s *Server) dashboard(w http.ResponseWriter, r *http.Request) {
 		if err := erows.Scan(&e.EventID, &e.HostID, &e.SubnetID, &e.SubnetCIDR, &e.IP,
 			&override, &dns, &e.TS, &e.Event, &e.Details); err != nil {
 			erows.Close()
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		if override != "" {
@@ -422,7 +431,7 @@ func (s *Server) listSubnets(w http.ResponseWriter, r *http.Request) {
 		 FROM subnets ORDER BY cidr`,
 	)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -432,7 +441,7 @@ func (s *Server) listSubnets(w http.ResponseWriter, r *http.Request) {
 		var sr subnetRow
 		var enabled int
 		if err := rows.Scan(&sr.ID, &sr.CIDR, &sr.Name, &enabled, &sr.ScanIntervalSec, &sr.LastScanAt, &sr.LastScanErr); err != nil {
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		sr.ScanEnabled = enabled != 0
@@ -470,16 +479,16 @@ func (s *Server) createSubnet(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/subnets?err=insert_failed", http.StatusSeeOther)
 		return
 	}
-	http.Redirect(w, r, "/subnets", http.StatusSeeOther)
+	http.Redirect(w, r, pathSubnets, http.StatusSeeOther)
 }
 
 func (s *Server) deleteSubnet(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if _, err := s.db.Exec(`DELETE FROM subnets WHERE id = ?`, id); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/subnets", http.StatusSeeOther)
+	http.Redirect(w, r, pathSubnets, http.StatusSeeOther)
 }
 
 func (s *Server) editSubnet(w http.ResponseWriter, r *http.Request) {
@@ -500,10 +509,10 @@ func (s *Server) editSubnet(w http.ResponseWriter, r *http.Request) {
 		`UPDATE subnets SET name = ?, scan_interval_sec = ? WHERE id = ?`,
 		name, interval, id,
 	); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, fmt.Sprintf("/subnets/%d", id), http.StatusSeeOther)
+	http.Redirect(w, r, fmt.Sprintf(pathSubnetFmt, id), http.StatusSeeOther)
 }
 
 func (s *Server) toggleSubnet(w http.ResponseWriter, r *http.Request) {
@@ -513,10 +522,10 @@ func (s *Server) toggleSubnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := s.db.Exec(`UPDATE subnets SET scan_enabled = 1 - scan_enabled WHERE id = ?`, id); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, safeRedirect(r.FormValue("redirect"), "/subnets"), http.StatusSeeOther)
+	http.Redirect(w, r, safeRedirect(r.FormValue("redirect"), pathSubnets), http.StatusSeeOther)
 }
 
 func (s *Server) scanSubnet(w http.ResponseWriter, r *http.Request) {
@@ -582,7 +591,7 @@ func (s *Server) viewSubnet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	sub.ScanEnabled = enabled != 0
@@ -593,7 +602,7 @@ func (s *Server) viewSubnet(w http.ResponseWriter, r *http.Request) {
 		 FROM hosts WHERE subnet_id = ?`, id,
 	)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -602,7 +611,7 @@ func (s *Server) viewSubnet(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var h hostView
 		if err := rows.Scan(&h.ID, &h.SubnetID, &h.IP, &h.MAC, &h.HostnameDNS, &h.HostnameOverride, &h.Status, &h.FirstSeen, &h.LastSeen, &h.Comments, &h.Tags); err != nil {
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		hosts = append(hosts, h)
@@ -649,10 +658,10 @@ func (s *Server) updateHost(w http.ResponseWriter, r *http.Request) {
 		`UPDATE hosts SET hostname_override = ?, comments = ?, tags = ? WHERE id = ?`,
 		override, comments, tags, id,
 	); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, safeRedirect(r.FormValue("redirect"), fmt.Sprintf("/subnets/%d", subnetID)), http.StatusSeeOther)
+	http.Redirect(w, r, safeRedirect(r.FormValue("redirect"), fmt.Sprintf(pathSubnetFmt, subnetID)), http.StatusSeeOther)
 }
 
 func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
@@ -673,7 +682,7 @@ func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 
@@ -684,7 +693,7 @@ func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
 		 FROM subnets WHERE id = ?`, h.SubnetID,
 	).Scan(&sub.ID, &sub.CIDR, &sub.Name, &enabled, &sub.ScanIntervalSec, &sub.LastScanAt, &sub.LastScanErr)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	sub.ScanEnabled = enabled != 0
@@ -693,7 +702,7 @@ func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
 		`SELECT ts, event, details FROM scan_events WHERE host_id = ? ORDER BY id DESC LIMIT 100`, id,
 	)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -701,7 +710,7 @@ func (s *Server) viewHost(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var e eventRow
 		if err := rows.Scan(&e.TS, &e.Event, &e.Details); err != nil {
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		events = append(events, e)
@@ -763,7 +772,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		rows, err = s.db.Query(query+` ORDER BY e.id DESC LIMIT ?`, limit+1)
 	}
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -774,7 +783,7 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		var override, dns string
 		if err := rows.Scan(&e.EventID, &e.HostID, &e.SubnetID, &e.SubnetCIDR, &e.IP,
 			&override, &dns, &e.TS, &e.Event, &e.Details); err != nil {
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		if override != "" {
@@ -817,7 +826,7 @@ func (s *Server) exportSubnet(w http.ResponseWriter, r *http.Request) {
 		 FROM hosts WHERE subnet_id = ?`, id,
 	)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -832,7 +841,7 @@ func (s *Server) exportSubnet(w http.ResponseWriter, r *http.Request) {
 		var h exportRow
 		if err := rows.Scan(&h.IP, &h.DNS, &h.Override, &h.MAC, &h.Status,
 			&h.FirstSeen, &h.LastSeen, &h.Comments, &h.Tags); err != nil {
-			http.Error(w, "scan error", http.StatusInternalServerError)
+			http.Error(w, msgScanError, http.StatusInternalServerError)
 			return
 		}
 		hosts = append(hosts, h)
@@ -844,7 +853,7 @@ func (s *Server) exportSubnet(w http.ResponseWriter, r *http.Request) {
 	})
 
 	safeName := strings.NewReplacer("/", "-", " ", "_", ":", "-").Replace(cidr)
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set(headerContentType, "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="subnet_%s.csv"`, safeName))
 
 	cw := csv.NewWriter(w)
@@ -876,12 +885,12 @@ func (s *Server) exportEvents(w http.ResponseWriter, r *http.Request) {
 		ORDER BY e.id DESC
 	`)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
+	w.Header().Set(headerContentType, "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="events.csv"`)
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"timestamp", "subnet", "ip", "hostname", "event", "details"})
@@ -921,7 +930,7 @@ func (s *Server) getSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
 	uid, ok := r.Context().Value(userIDKey).(int64)
 	if !ok || uid == 0 {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		http.Redirect(w, r, pathLogin, http.StatusSeeOther)
 		return
 	}
 	theme := "light"
@@ -940,7 +949,7 @@ func (s *Server) postSettings(w http.ResponseWriter, r *http.Request) {
 		`UPDATE users SET ui_theme = ?, ui_layout = ?, ui_density = ? WHERE id = ?`,
 		theme, layout, density, uid,
 	); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	// Remove any stale pre-DB prefs cookie so the browser stops carrying them.
@@ -970,7 +979,7 @@ func (s *Server) bulkHosts(w http.ResponseWriter, r *http.Request) {
 			ids = append(ids, n)
 		}
 	}
-	dest := fmt.Sprintf("/subnets/%d", subnetID)
+	dest := fmt.Sprintf(pathSubnetFmt, subnetID)
 	if len(ids) == 0 {
 		http.Redirect(w, r, dest, http.StatusSeeOther)
 		return
@@ -1002,7 +1011,7 @@ func (s *Server) bulkHosts(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := s.db.Exec(query, args...); err != nil {
 		s.logger.Error("bulk", "action", action, "err", err)
-		http.Error(w, "db error", http.StatusInternalServerError)
+		http.Error(w, msgDBError, http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)

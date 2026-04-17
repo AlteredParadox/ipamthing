@@ -61,34 +61,42 @@ func (s *Scanner) Scan(ctx context.Context, cidr string) ([]Result, error) {
 	}
 
 	if s.icmp != nil {
-		resp := s.icmp.Sweep(ctx, ips, s.Timeout)
-		for i, ip := range ips {
-			if resp[ip] {
-				results[i].Alive = true
-				results[i].Method = "icmp"
-			}
-		}
+		s.applyICMP(ctx, ips, results)
 	}
-
 	s.tcpSweep(ctx, ips, results)
-
-	if neighbors, err := ReadNeighbors(); err == nil {
-		for i := range results {
-			if mac, ok := neighbors[results[i].IP]; ok {
-				results[i].MAC = mac
-				if !results[i].Alive {
-					results[i].Alive = true
-					results[i].Method = "arp"
-				}
-			}
-		}
-	} else {
-		s.logger.Debug("neighbor read failed", "err", err)
-	}
-
+	s.enrichWithNeighbors(results)
 	s.resolveDNS(ctx, results)
 
 	return results, nil
+}
+
+func (s *Scanner) applyICMP(ctx context.Context, ips []netip.Addr, results []Result) {
+	resp := s.icmp.Sweep(ctx, ips, s.Timeout)
+	for i, ip := range ips {
+		if resp[ip] {
+			results[i].Alive = true
+			results[i].Method = "icmp"
+		}
+	}
+}
+
+func (s *Scanner) enrichWithNeighbors(results []Result) {
+	neighbors, err := ReadNeighbors()
+	if err != nil {
+		s.logger.Debug("neighbor read failed", "err", err)
+		return
+	}
+	for i := range results {
+		mac, ok := neighbors[results[i].IP]
+		if !ok {
+			continue
+		}
+		results[i].MAC = mac
+		if !results[i].Alive {
+			results[i].Alive = true
+			results[i].Method = "arp"
+		}
+	}
 }
 
 func (s *Scanner) tcpSweep(ctx context.Context, ips []netip.Addr, results []Result) {

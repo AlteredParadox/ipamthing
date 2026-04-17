@@ -8,29 +8,27 @@
     bindRowEdit();
   }
 
-  // "Edit" button on a host row: swap that row into edit mode so the
-  // hostname and comments inputs appear. Save is the existing form submit.
   function bindRowEdit() {
     document.querySelectorAll('button.edit-btn').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        var row = btn.closest('tr');
+        const row = btn.closest('tr');
         if (!row) return;
         row.classList.add('editing');
-        var input = row.querySelector('input[name="hostname_override"]');
+        const input = row.querySelector('input[name="hostname_override"]');
         if (input) input.focus();
       });
     });
   }
 
   function bindBulk() {
-    var form = document.getElementById('bulk-form');
+    const form = document.getElementById('bulk-form');
     if (!form) return;
 
-    var selectAll = document.getElementById('select-all');
-    var countEl = document.getElementById('bulk-count');
-    var actionSelect = document.getElementById('bulk-action-select');
-    var valueInput = document.getElementById('bulk-value-input');
-    var applyBtn = document.getElementById('bulk-apply');
+    const selectAll = document.getElementById('select-all');
+    const countEl = document.getElementById('bulk-count');
+    const actionSelect = document.getElementById('bulk-action-select');
+    const valueInput = document.getElementById('bulk-value-input');
+    const applyBtn = document.getElementById('bulk-apply');
 
     function checks() { return document.querySelectorAll('.host-check'); }
     function visibleChecks() {
@@ -40,7 +38,7 @@
     }
     function updateCount() {
       if (!countEl) return;
-      var n = document.querySelectorAll('.host-check:checked').length;
+      const n = document.querySelectorAll('.host-check:checked').length;
       countEl.textContent = n + ' selected';
     }
 
@@ -51,21 +49,21 @@
       });
     }
     document.addEventListener('change', function (e) {
-      if (e.target.classList && e.target.classList.contains('host-check')) updateCount();
+      if (e.target.classList?.contains('host-check')) updateCount();
     });
 
     if (applyBtn) {
       applyBtn.addEventListener('click', function () {
-        var action = actionSelect ? actionSelect.value : '';
+        const action = actionSelect ? actionSelect.value : '';
         if (!action) { alert('Choose a bulk action'); return; }
-        var n = document.querySelectorAll('.host-check:checked').length;
+        const n = document.querySelectorAll('.host-check:checked').length;
         if (n === 0) { alert('No hosts selected'); return; }
-        var msg;
+        let msg;
         if (action === 'delete') msg = 'Delete selected hosts?';
         else if (action === 'set_comment') msg = 'Set comment on selected hosts?';
         else msg = 'Set tags on selected hosts?';
         if (!confirm(msg + ' (' + n + ' host' + (n === 1 ? '' : 's') + ')')) return;
-        var value = valueInput ? valueInput.value : '';
+        const value = valueInput ? valueInput.value : '';
         document.getElementById('bulk-action').value = action;
         if (action === 'set_comment') document.getElementById('bulk-comments').value = value;
         if (action === 'set_tags') document.getElementById('bulk-tags').value = value;
@@ -75,17 +73,16 @@
   }
 
   function bindFilter() {
-    var input = document.getElementById('host-filter');
-    var countEl = document.getElementById('filter-count');
+    const input = document.getElementById('host-filter');
+    const countEl = document.getElementById('filter-count');
     if (!input) return;
     input.addEventListener('input', function () {
-      var q = input.value.toLowerCase().trim();
-      var shown = 0, total = 0;
+      const q = input.value.toLowerCase().trim();
+      let shown = 0, total = 0;
       document.querySelectorAll('tr.host-row').forEach(function (tr) {
         total++;
         if (!q) { tr.style.display = ''; shown++; return; }
-        var s = (tr.getAttribute('data-search') || '').toLowerCase();
-        var match = s.indexOf(q) >= 0;
+        const match = (tr.dataset.search || '').toLowerCase().includes(q);
         tr.style.display = match ? '' : 'none';
         if (match) shown++;
       });
@@ -93,11 +90,10 @@
     });
   }
 
-  // Any form with data-confirm="message" will prompt before submitting.
   function bindConfirms() {
     document.querySelectorAll('form[data-confirm]').forEach(function (f) {
       f.addEventListener('submit', function (e) {
-        if (!confirm(f.getAttribute('data-confirm'))) e.preventDefault();
+        if (!confirm(f.dataset.confirm)) e.preventDefault();
       });
     });
   }

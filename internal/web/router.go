@@ -22,6 +22,19 @@ var templatesFS embed.FS
 //go:embed static
 var staticFS embed.FS
 
+// ServerDeps bundles the dependencies NewRouter needs so the parameter list
+// doesn't keep growing as features are added.
+type ServerDeps struct {
+	Logger       *slog.Logger
+	DB           *sql.DB
+	Sessions     *auth.SessionStore
+	LoginLimiter *auth.LoginLimiter
+	Scanner      *scan.Scanner
+	Scheduler    *scan.Scheduler
+	SetupToken   string
+	TrustProxy   bool
+}
+
 type Server struct {
 	logger       *slog.Logger
 	db           *sql.DB
@@ -33,7 +46,7 @@ type Server struct {
 	trustProxy   bool
 
 	setupMu    sync.Mutex
-	setupToken string // required for /setup; cleared after first admin is created
+	setupToken string
 }
 
 var funcMap = template.FuncMap{
@@ -60,7 +73,7 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, loginLimiter *auth.LoginLimiter, scanner *scan.Scanner, scheduler *scan.Scheduler, setupToken string, trustProxy bool) http.Handler {
+func NewRouter(deps ServerDeps) http.Handler {
 	pages := []string{"setup", "login", "subnets", "hosts", "host", "events", "dashboard", "settings"}
 	tmpls := make(map[string]*template.Template, len(pages))
 	for _, p := range pages {
@@ -74,9 +87,10 @@ func NewRouter(logger *slog.Logger, db *sql.DB, sessions *auth.SessionStore, log
 	}
 
 	s := &Server{
-		logger: logger, db: db, sessions: sessions, loginLimiter: loginLimiter,
-		scanner: scanner, scheduler: scheduler, tmpls: tmpls,
-		setupToken: setupToken, trustProxy: trustProxy,
+		logger: deps.Logger, db: deps.DB, sessions: deps.Sessions,
+		loginLimiter: deps.LoginLimiter, scanner: deps.Scanner,
+		scheduler: deps.Scheduler, tmpls: tmpls,
+		setupToken: deps.SetupToken, trustProxy: deps.TrustProxy,
 	}
 
 	mux := http.NewServeMux()
