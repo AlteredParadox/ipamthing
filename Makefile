@@ -1,12 +1,18 @@
-.PHONY: test cover cover-html build build-linux build-windows sonar clean
+.PHONY: vet test cover cover-html build build-linux build-windows sonar clean
+
+# gofmt -l prints unformatted files; fail if there are any, then go vet.
+# CI runs exactly this (see .github/workflows/ci.yml).
+vet:
+	@unformatted="$$(gofmt -l .)"; if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
+	go vet ./...
 
 # Run all tests
 test:
 	go test ./...
 
-# Run tests with coverage report (used by SonarQube)
+# Run tests with coverage report (what the SonarQube Cloud scan imports)
 cover:
-	go test -coverprofile=coverage.out ./...
+	go test -covermode=atomic -coverprofile=coverage.out ./...
 	@echo "--- coverage summary ---"
 	@go tool cover -func=coverage.out | tail -1
 
@@ -26,9 +32,10 @@ build-linux:
 build-windows:
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ipamthing.exe .
 
-# Run SonarQube analysis (requires sonar-scanner on PATH and coverage.out)
+# Run a SonarQube Cloud analysis locally (requires sonar-scanner on PATH and
+# SONAR_TOKEN exported). CI does this on every push and PR.
 sonar: cover
 	sonar-scanner
 
 clean:
-	rm -f ipamthing ipamthing-linux-amd64 ipamthing.exe coverage.out
+	rm -f ipamthing ipamthing-linux-amd64 ipamthing-linux-arm64 ipamthing.exe coverage.out
