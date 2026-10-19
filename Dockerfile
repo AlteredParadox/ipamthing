@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 # --- build stage ------------------------------------------------------------
-FROM golang:1.26-alpine AS build
+FROM golang:1.27-alpine AS build
 WORKDIR /src
 
 # Dependencies first so subsequent builds can cache them.
@@ -17,7 +17,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 # --- runtime stage ----------------------------------------------------------
 # Alpine gives us iproute2 for "ip neigh show" (covers IPv6 neighbor lookups;
 # without it we fall back to /proc/net/arp and only see IPv4 MACs).
-FROM alpine:3.20
+FROM alpine:3.24
 
 RUN apk add --no-cache iproute2 \
  && addgroup -S ipamthing \
