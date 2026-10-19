@@ -29,21 +29,29 @@ pull request:
   exceptions live in `sonar-project.properties`, not the Cloud UI.
 - `release.yml` — on a `vX.Y.Z` tag, builds static binaries for
   linux/amd64, linux/arm64 and windows/amd64 and publishes them with a
-  `SHA256SUMS` file as a GitHub Release. A manual run of the workflow is a
-  dry run: it builds everything and uploads workflow artifacts without
-  creating a Release.
+  `SHA256SUMS` file as a GitHub Release, and pushes the container image to
+  `ghcr.io/alteredparadox/ipamthing` (linux/amd64 + linux/arm64). A manual
+  run of the workflow is a dry run: it builds everything and uploads
+  workflow artifacts without creating a Release or pushing an image.
 
 Dependabot keeps Go modules, the pinned actions and the Docker base images
 current (weekly, grouped).
 
-To run the checks locally: `make vet test`. To run a Sonar analysis
-locally: `make sonar` (requires `sonar-scanner` on PATH and `SONAR_TOKEN`
-exported).
+To run the checks locally: `make vet license-check test`. To run a Sonar
+analysis locally: `make sonar` (requires `sonar-scanner` on PATH and
+`SONAR_TOKEN` exported).
 
 ## Flags
 
 - `-addr` — HTTP listen address (default `:8080`)
 - `-db` — SQLite database path (default `ipamthing.db`)
+- `-setup-token` — one-time token required for first-run `/setup` (random
+  and logged if empty and no users exist)
+- `-trust-proxy` — honor `X-Forwarded-Proto` / `X-Forwarded-For` from a
+  reverse proxy
+- `-event-retention-days` — purge scan events older than N days (default
+  `90`, `0` keeps forever)
+- `-version` — print the version and exit
 
 ## Build
 
@@ -52,7 +60,7 @@ cleanly to any target.
 
 ```
 go mod tidy
-go build -o ipamthing .
+make build        # stamps the version from `git describe`; `go build .` reports "dev"
 ```
 
 For a stripped static Linux amd64 binary (suitable for scp to a server):
@@ -156,14 +164,20 @@ just enough to open raw ICMP sockets; `NoNewPrivileges` + `ProtectSystem`
 
 ## Docker
 
-A multi-stage Dockerfile and a `docker-compose.yml` are included. The
-runtime image is `alpine:3.24 + iproute2 + ipamthing` (~20 MB) running as
-the unprivileged `ipamthing` user.
+Every release publishes a multi-arch image (linux/amd64, linux/arm64) to
+GitHub Container Registry; `docker-compose.yml` uses it. The runtime image
+is `alpine:3.24 + iproute2 + ipamthing` (~20 MB) running as the unprivileged
+`ipamthing` user.
 
 ```
-docker compose up -d --build
+docker pull ghcr.io/alteredparadox/ipamthing:latest   # or :0.2.0 to pin
+docker compose up -d
 docker compose logs ipamthing        # read the first-run setup token
 ```
+
+To build from source instead, swap `image:` for `build: .` in the compose
+file (or `docker build -t ipamthing .`); the Dockerfile stamps the version
+from the `VERSION` build arg.
 
 The compose file uses **host networking** so the scanner sees the real LAN
 and per-IP rate limiting sees real client addresses. If you'd rather run on
@@ -205,11 +219,10 @@ machine on the LAN, or use Portainer's built-in container terminal / logs.
 To bypass compose and run directly:
 
 ```
-docker build -t ipamthing:latest .
 docker run -d --name ipamthing \
   --network host --cap-add NET_RAW \
   -v ipamthing-data:/var/lib/ipamthing \
-  ipamthing:latest
+  ghcr.io/alteredparadox/ipamthing:latest
 ```
 
 ### 4. Upgrading
@@ -225,3 +238,36 @@ sudo systemctl restart ipamthing
 ```
 
 The SQLite schema auto-migrates on startup (idempotent `ALTER TABLE` guards).
+
+## License
+
+ipamthing is free software under the **GNU Affero General Public License v3
+or later** ([`LICENSE`](LICENSE)).
+
+The AGPL's §13 obligation is to offer the Corresponding Source to everyone who
+interacts with the program *over a network*, so these three routes are
+deliberately served **without login** (and before first-run setup), since a
+login wall would defeat the offer:
+
+| Route | Serves |
+| --- | --- |
+| `/license` | the AGPL text embedded in this binary |
+| `/third-party-licenses` | every linked dependency's licence and notices |
+| `/source` | redirects to the Corresponding Source, pinned to the running version |
+
+They are linked from the page footer next to the version. A stamped release
+points `/source` at its own tag, so the source you are offered is the source
+that is running; an unstamped build can only point at the repository.
+
+`THIRD_PARTY_LICENSES.md` is generated from the modules **actually linked into
+the binary** (read back off a probe build with `go version -m`):
+
+```sh
+make notices        # regenerate (also runs as part of `make build`)
+make notices-check  # fail if the committed copy is stale
+```
+
+`notices-check` gates the release workflow rather than every PR, because
+Dependabot bumps go.mod but cannot regenerate the file. Every first-party
+source file carries the AGPL header; `make license-check` enforces that on
+every PR and `make license-headers` stamps any new file.

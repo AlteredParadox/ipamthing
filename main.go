@@ -1,3 +1,19 @@
+// ipamthing — a lightweight single-binary IPAM.
+// Copyright (C) 2026 AlteredParadox
+//
+// This program is free software: you can redistribute it and/or modify it
+// under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or (at your
+// option) any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+// for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package main
 
 import (
@@ -7,6 +23,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -45,7 +62,14 @@ func purgeEvents(ctx context.Context, database *sql.DB, retention time.Duration,
 	}
 }
 
+// version is stamped at build time via -ldflags "-X main.version=..."
+// (see the Makefile and .github/workflows/release.yml); an unstamped build
+// reports "dev". It is logged at startup, shown in the UI footer and used
+// by /source to pin the AGPL §13 source offer to the running release.
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", "ipamthing.db", "SQLite database file path")
 	setupTokenFlag := flag.String("setup-token", "", "one-time token required for first-run /setup (random + logged if empty and no users exist)")
@@ -53,7 +77,13 @@ func main() {
 	retentionDays := flag.Int("event-retention-days", 90, "purge scan events older than N days (0 = keep forever)")
 	flag.Parse()
 
+	if *showVersion {
+		fmt.Println("ipamthing", version)
+		return
+	}
+
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logger.Info("ipamthing starting", "version", version)
 
 	database, err := db.Open(*dbPath)
 	if err != nil {
@@ -112,6 +142,10 @@ func main() {
 		Scheduler:    scheduler,
 		SetupToken:   setupToken,
 		TrustProxy:   *trustProxy,
+
+		Version:            version,
+		License:            license,
+		ThirdPartyLicenses: thirdPartyLicenses,
 	})
 
 	srv := &http.Server{
