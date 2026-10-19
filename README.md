@@ -157,7 +157,7 @@ just enough to open raw ICMP sockets; `NoNewPrivileges` + `ProtectSystem`
 ## Docker
 
 A multi-stage Dockerfile and a `docker-compose.yml` are included. The
-runtime image is `alpine:3.20 + iproute2 + ipamthing` (~20 MB) running as
+runtime image is `alpine:3.24 + iproute2 + ipamthing` (~20 MB) running as
 the unprivileged `ipamthing` user.
 
 ```
