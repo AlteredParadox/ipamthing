@@ -1,3 +1,19 @@
+// ipamthing — a lightweight single-binary IPAM.
+// Copyright (C) 2026 AlteredParadox
+//
+// This program is free software: you can redistribute it and/or modify it
+// under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or (at your
+// option) any later version.
+//
+// This program is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+// FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+// for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+
 package web
 
 import (
@@ -33,6 +49,14 @@ type ServerDeps struct {
 	Scheduler    *scan.Scheduler
 	SetupToken   string
 	TrustProxy   bool
+
+	// Version is the build version stamped by the release workflow ("dev"
+	// when unstamped); /source pins its AGPL §13 offer to it.
+	Version string
+	// License and ThirdPartyLicenses are the embedded legal texts served
+	// unauthenticated at /license and /third-party-licenses.
+	License            []byte
+	ThirdPartyLicenses []byte
 }
 
 type Server struct {
@@ -44,6 +68,9 @@ type Server struct {
 	scheduler    *scan.Scheduler
 	tmpls        map[string]*template.Template
 	trustProxy   bool
+	version      string
+	license      []byte
+	thirdParty   []byte
 
 	setupMu    sync.Mutex
 	setupToken string
@@ -91,12 +118,19 @@ func NewRouter(deps ServerDeps) http.Handler {
 		loginLimiter: deps.LoginLimiter, scanner: deps.Scanner,
 		scheduler: deps.Scheduler, tmpls: tmpls,
 		setupToken: deps.SetupToken, trustProxy: deps.TrustProxy,
+		version: deps.Version, license: deps.License, thirdParty: deps.ThirdPartyLicenses,
 	}
 
 	mux := http.NewServeMux()
 
 	static, _ := fs.Sub(staticFS, "static")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(static))))
+
+	// AGPL §13: the license texts and the source offer are served to every
+	// network user, so they sit outside auth and the first-run redirect.
+	mux.Handle("GET /license", serveLegalText(s.license, "license text not embedded in this build"))
+	mux.Handle("GET /third-party-licenses", serveLegalText(s.thirdParty, "third-party notices not embedded in this build"))
+	mux.HandleFunc("GET /source", s.handleSource)
 
 	mux.HandleFunc("GET /setup", s.getSetup)
 	mux.HandleFunc("POST /setup", s.postSetup)

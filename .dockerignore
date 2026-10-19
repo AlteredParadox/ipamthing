@@ -6,6 +6,7 @@ Dockerfile
 docker-compose.yml
 docker-compose.portainer.yml
 README.md
+scripts
 *.db
 *.db-wal
 *.db-shm

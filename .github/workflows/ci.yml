@@ -39,7 +39,14 @@ jobs:
       - name: make vet
         run: make vet
 
-      # The static binary the README documents.
+      # Every first-party source carries the AGPL notice. Cheap and offline,
+      # so unlike notices-check this one is safe to gate every PR on —
+      # Dependabot never touches source headers.
+      - name: make license-check
+        run: make license-check
+
+      # The static binary the README documents (regenerates the embedded
+      # third-party notices first, like a developer's build does).
       - name: make build
         run: make build
 
@@ -82,16 +89,19 @@ jobs:
           context: .
           load: true
           tags: ipamthing:ci
+          build-args: VERSION=ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
       # Smoke test: the image starts as the unprivileged user, creates its
-      # database on the volume and serves the login/setup page.
+      # database on the volume, reports the stamped version and serves the
+      # embedded AGPL text unauthenticated (before first-run setup).
       - name: Run image
         run: |
+          docker run --rm ipamthing:ci -version | grep -qx 'ipamthing ci'
           docker run -d --name smoke -p 127.0.0.1:8080:8080 ipamthing:ci
           for i in $(seq 1 30); do
-            if curl -sfo /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/ ; then ok=1; break; fi
+            if out=$(curl -sf http://127.0.0.1:8080/license); then break; fi
             sleep 1
           done
-          [ -n "$ok" ] || { docker logs smoke; exit 1; }
+          echo "$out" | grep -q 'GNU AFFERO GENERAL PUBLIC LICENSE' || { docker logs smoke; exit 1; }
           docker stop smoke >/dev/null

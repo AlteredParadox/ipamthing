@@ -1,3 +1,21 @@
+{{/*
+ipamthing — a lightweight single-binary IPAM.
+Copyright (C) 2026 AlteredParadox
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero General Public License
+for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+*/}}
+
 {{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
 {{define "layout"}}<!doctype html>
 <html lang="en" data-theme="{{.Prefs.Theme}}" data-layout="{{.Prefs.Layout}}" data-density="{{.Prefs.Density}}">
@@ -24,6 +42,12 @@
 {{if .Notice}}<div class="info">{{.Notice}}</div>{{end}}
 {{template "content" .}}
 </main>
+<footer>
+<span>ipamthing {{.Version}}</span>
+<a href="/license">license</a>
+<a href="/third-party-licenses">third-party licenses</a>
+<a href="/source">source</a>
+</footer>
 </body>
 </html>
 {{end}}

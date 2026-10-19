@@ -10,7 +10,10 @@
 
 services:
   ipamthing:
-    build: .
+    # Published by the release workflow for linux/amd64 and linux/arm64;
+    # pin a version tag (e.g. :0.2.0) for reproducible deploys. To build
+    # from source instead, replace `image:` with `build: .`.
+    image: ghcr.io/alteredparadox/ipamthing:latest
     container_name: ipamthing
     restart: unless-stopped
 

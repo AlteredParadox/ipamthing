@@ -2,16 +2,18 @@
 #
 # ipamthing ships as a single static binary (installed to /usr/local/bin by
 # the systemd unit, or scp'd to a server), so the release artifacts are the
-# binaries plus a SHA256SUMS file: linux amd64 + arm64 and windows amd64,
-# the same set the previous Gitea release built.
+# binaries plus a SHA256SUMS file — linux amd64 + arm64 and windows amd64 —
+# and the same binary wrapped in the Alpine image pushed to GHCR (see
+# Dockerfile) for people who run containers.
 #
 # Trigger: pushing a `vX.Y.Z` tag. A manual `workflow_dispatch` run builds
 # every target and uploads them as workflow artifacts WITHOUT creating a
-# Release — a cheap "does it still build and pass" check that also exercises
-# this workflow, which a tag push would otherwise be the first thing to run.
-# Both paths gate on the same tests as ci.yml.
+# Release or pushing an image — a cheap "does it still build and pass" check
+# that also exercises this workflow, which a tag push would otherwise be the
+# first thing to run. Both paths gate on the same tests as ci.yml.
 #
-# Least privilege: only the tag-only `publish` job gets contents: write.
+# Least privilege: only the tag-only `publish` job gets contents: write and
+# only `image` gets packages: write (and pushes only on a tag push).
 # Actions are pinned to full commit SHAs (a mutable tag can be repointed at
 # malicious code); the trailing comment records the tag. Keep the comment at
 # the FULL version — Dependabot leaves a bare "# v7" stale as the SHA moves.
@@ -40,6 +42,15 @@ jobs:
       - name: make test
         run: make test
 
+      - name: make license-check
+        run: make license-check
+
+      # THIRD_PARTY_LICENSES.md is embedded in the binary, so a release must
+      # not ship notices that disagree with what is linked into it. This is
+      # the ONE place the check gates — see the Makefile for why not on PRs.
+      - name: make notices-check
+        run: make notices-check
+
   # Runs on BOTH triggers, so a dispatch proves the build still works.
   # Pure Go (modernc.org/sqlite, no cgo) cross-compiles with nothing but
   # GOOS/GOARCH — no QEMU, no buildx.
@@ -64,13 +75,17 @@ jobs:
         with:
           go-version-file: go.mod
 
+      # A dispatch run has no tag, so stamp "dev" — the binary always reports
+      # something, and only a tag build claims a version.
       - name: Build
         env:
           CGO_ENABLED: '0'
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -trimpath -ldflags "-s -w" \
+          v="${GITHUB_REF_NAME}"
+          [ "${GITHUB_REF_TYPE}" = tag ] || v="dev"
+          go build -trimpath -ldflags "-s -w -X main.version=${v}" \
             -o "ipamthing-${GOOS}-${GOARCH}${{ matrix.ext }}" .
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -79,12 +94,63 @@ jobs:
           path: ipamthing-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
           if-no-files-found: error
 
+  # The container image, both arches in one manifest list. Runs on both
+  # triggers so a dispatch proves it still builds; pushes to GHCR only on a
+  # tag push, with the same event guard as `publish`. Cross-compiled in the
+  # build stage, so no QEMU. GITHUB_TOKEN is enough for ghcr.io: the package
+  # is created under the repository's owner and linked to the repository.
+  image:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # v0.2.0 -> 0.2.0, 0.2 and latest; a dispatch run gets a `dev` tag that
+      # is never pushed.
+      - uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        id: meta
+        with:
+          images: ghcr.io/alteredparadox/ipamthing
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=dev,enable=${{ github.ref_type != 'tag' }}
+      - name: Version
+        id: ver
+        run: |
+          v="${GITHUB_REF_NAME}"
+          [ "${GITHUB_REF_TYPE}" = tag ] || v="dev"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' && github.ref_type == 'tag' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.ver.outputs.version }}
+          # One plain manifest list per tag (no attestation manifests), so
+          # `docker pull` and the GHCR UI show exactly two images.
+          provenance: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # Tag PUSH only: this is the ONLY job granted contents: write. Requiring
   # event_name == 'push' keeps a manual dispatch — which can target a tag —
   # out of the publishing path entirely.
   publish:
     if: github.event_name == 'push' && github.ref_type == 'tag'
-    needs: build
+    needs: [build, image]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -105,12 +171,15 @@ jobs:
 
       # gh is preinstalled on the runner — no third-party action, so nothing
       # beyond GitHub itself ever sees the token. --generate-notes builds the
-      # changelog from the commits since the previous tag.
+      # changelog from the commits since the previous tag; --notes is placed
+      # above it and points at the image this tag produced.
       - name: Create Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          v="${GITHUB_REF_NAME#v}"
           gh release create "${GITHUB_REF_NAME}" \
             --title "${GITHUB_REF_NAME}" \
+            --notes "Container image: \`ghcr.io/alteredparadox/ipamthing:${v}\` (linux/amd64, linux/arm64)." \
             --generate-notes \
             dist/ipamthing-* dist/SHA256SUMS
