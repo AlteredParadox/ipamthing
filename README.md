@@ -17,24 +17,28 @@ Simple, low-dependency web-based IPAM tool. Go + SQLite, single static binary.
 - Manual scan and continuous background monitoring
 - Basic username/password login
 
-## CI / SonarQube
+## CI / Releases
 
-A Gitea Actions workflow at `.gitea/workflows/ci.yml` runs on every push
-to `main`: tests with coverage, build verification, and a SonarQube scan.
+GitHub Actions (`.github/workflows/`) runs on every push to `main` and every
+pull request:
 
-**Setup:**
+- `ci.yml` — `make vet` (gofmt + go vet), build, tests, race tests; plus
+  advisory `govulncheck` and Docker image build/smoke-test jobs.
+- `sonarqube.yml` — [SonarQube Cloud](https://sonarcloud.io/project/overview?id=AlteredParadox_ipamthing)
+  analysis with Go coverage. Needs the `SONAR_TOKEN` repo secret; rule
+  exceptions live in `sonar-project.properties`, not the Cloud UI.
+- `release.yml` — on a `vX.Y.Z` tag, builds static binaries for
+  linux/amd64, linux/arm64 and windows/amd64 and publishes them with a
+  `SHA256SUMS` file as a GitHub Release. A manual run of the workflow is a
+  dry run: it builds everything and uploads workflow artifacts without
+  creating a Release.
 
-1. Deploy a Gitea Actions runner (see `runner-compose.yml` for a
-   ready-made compose file). Register it via Gitea → Site Administration
-   → Runners.
-2. Add two **repo secrets** in Gitea (repo → Settings → Secrets):
-   - `SONAR_TOKEN` — a SonarQube user token (Administration → Security → Generate Tokens)
-   - `SONAR_HOST_URL` — e.g. `http://10.11.0.5:9000`
-3. Push to `main` — the workflow runs automatically. Results appear in
-   the repo's Actions tab and in SonarQube's project dashboard.
+Dependabot keeps Go modules, the pinned actions and the Docker base images
+current (weekly, grouped).
 
-To run locally without CI: `make sonar` (requires `sonar-scanner` on
-PATH and the same env vars exported).
+To run the checks locally: `make vet test`. To run a Sonar analysis
+locally: `make sonar` (requires `sonar-scanner` on PATH and `SONAR_TOKEN`
+exported).
 
 ## Flags
 
@@ -89,7 +93,12 @@ IPv4 and IPv6), otherwise falls back to `/proc/net/arp` (IPv4 only).
 The intended deployment is a single static binary + systemd unit + dedicated
 service user. No runtime dependencies beyond the kernel.
 
-### 1. Cross-compile on your dev box
+### 1. Get a binary onto the server
+
+Download the latest release binary for your architecture from
+[GitHub Releases](https://github.com/AlteredParadox/ipamthing/releases)
+(`ipamthing-linux-amd64` or `ipamthing-linux-arm64`; verify against
+`SHA256SUMS`), or cross-compile on your dev box:
 
 ```
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ipamthing-linux-amd64 .
@@ -185,7 +194,7 @@ set these stack environment variables:
   to let the network's IPAM pool assign one.
 
 For a Git-backed Portainer stack: Stacks → Add stack → Repository →
-`ssh://git@<gitea-host>:<port>/<user>/ipamthing.git`, reference
+`https://github.com/AlteredParadox/ipamthing.git`, reference
 `refs/heads/main`, compose path `docker-compose.portainer.yml`. Enable
 GitOps updates (poll or webhook) for auto-redeploy on push.
 
@@ -206,7 +215,7 @@ docker run -d --name ipamthing \
 ### 4. Upgrading
 
 ```
-# on dev box
+# on dev box: download the new release binary, or rebuild
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o ipamthing-linux-amd64 .
 scp -P <port> ipamthing-linux-amd64 <user>@<host>:/tmp/
 

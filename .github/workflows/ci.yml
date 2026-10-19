@@ -1,0 +1,97 @@
+# Merge gate: the checks a change must pass. `make vet` (gofmt + go vet),
+# `make build` and `make test` are the project's own targets, so CI runs
+# exactly what a developer runs locally; the race suite runs separately
+# because the scanner, the rate limiter and the background monitor are
+# concurrent by design.
+name: ci
+
+# push only on main; branch pushes are covered by their pull_request run,
+# so PRs (including Dependabot's) don't run this twice.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: this job only reads the repo.
+permissions:
+  contents: read
+
+# A new push to the same ref supersedes the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions pinned to full commit SHAs (a retagged action can't change
+      # under us); the trailing comment records the tag. Keep the comment at
+      # the FULL version — Dependabot only refreshes a comment that already
+      # carries one, and a bare "# v7" silently goes stale as the SHA moves.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      # gofmt -l (fails on any unformatted file) + go vet ./...
+      - name: make vet
+        run: make vet
+
+      # The static binary the README documents.
+      - name: make build
+        run: make build
+
+      - name: make test
+        run: make test
+
+      # Subnet scans, the per-IP rate limiter and the background monitor all
+      # share state across goroutines — this is the suite that pins them.
+      - name: Race tests
+        run: go test -race ./...
+
+  # Known-vulnerability scan of what the binary actually links (stdlib
+  # included). Its own job, NOT the required `check`: a fresh stdlib advisory
+  # would otherwise turn every open PR red for a reason the PR can't fix —
+  # the fix is bumping the Go version in go.mod, which is what this job
+  # exists to flag. Symbol-level, so advisories in code we don't call are
+  # informational only.
+  vuln:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - name: govulncheck
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # The container image builds and starts. Its own job, NOT the required
+  # `check`: it repeats the Go build inside Docker and its failure modes
+  # (registry hiccups, a base-image tag moving) are not the PR's fault.
+  # Nothing is pushed; this only proves the Dockerfile the README documents
+  # still produces a working image.
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          load: true
+          tags: ipamthing:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      # Smoke test: the image starts as the unprivileged user, creates its
+      # database on the volume and serves the login/setup page.
+      - name: Run image
+        run: |
+          docker run -d --name smoke -p 127.0.0.1:8080:8080 ipamthing:ci
+          for i in $(seq 1 30); do
+            if curl -sfo /dev/null -w '%{http_code}\n' http://127.0.0.1:8080/ ; then ok=1; break; fi
+            sleep 1
+          done
+          [ -n "$ok" ] || { docker logs smoke; exit 1; }
+          docker stop smoke >/dev/null

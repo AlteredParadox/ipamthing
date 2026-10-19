@@ -1,12 +1,16 @@
 .git
+.github
 .gitignore
 .dockerignore
 Dockerfile
 docker-compose.yml
+docker-compose.portainer.yml
 README.md
 *.db
 *.db-wal
 *.db-shm
+coverage.out
 ipamthing
 ipamthing-linux-amd64
 ipamthing-linux-arm64
+ipamthing.exe
