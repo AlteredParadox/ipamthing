@@ -55,7 +55,7 @@ analysis locally: `make sonar` (requires `sonar-scanner` on PATH and
 
 ## Build
 
-Requires Go 1.26+. `modernc.org/sqlite` is pure-Go (no cgo), so cross-compiles
+Requires Go 1.27+. `modernc.org/sqlite` is pure-Go (no cgo), so cross-compiles
 cleanly to any target.
 
 ```
