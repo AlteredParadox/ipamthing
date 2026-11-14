@@ -24,7 +24,7 @@
 #     -v ipamthing-data:/var/lib/ipamthing ipamthing
 
 # --- build stage ------------------------------------------------------------
-FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:f92b6ef800e499660581efdabdf25d9d817a9d124eaf900924f0504e7e27e12d AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine@sha256:eb61c3873c97416fff0116553fff65d67a3549f72e11d9758849a689cdd8b523 AS build
 WORKDIR /src
 
 # Module download is its own layer so source edits do not refetch it.
@@ -44,7 +44,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOTOOLCHAIN="$(cat /toolchai
  && go version -m /out/ipamthing | head -1
 
 # --- runtime stage ----------------------------------------------------------
-FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
 
 RUN apk add --no-cache iproute2 \
  && addgroup -S ipamthing \
