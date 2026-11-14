@@ -1,6 +1,6 @@
 module ipamthing
 
-go 1.26.9
+go 1.27.4
 
 require (
 	golang.org/x/crypto v0.58.0
