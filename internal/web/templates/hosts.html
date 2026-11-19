@@ -83,23 +83,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <table class="hosts-table">
 <thead><tr>
 <th><input type="checkbox" id="select-all" aria-label="select all"></th>
-<th>IP</th><th>Hostname</th><th>MAC</th><th>Status</th><th>Tags</th><th>Last seen</th><th>Comments</th><th></th>
+<th data-sort="key">IP</th><th data-sort="text">Hostname</th><th data-sort="text">MAC</th><th data-sort="text">Status</th><th data-sort="text">Tags</th><th data-sort="num" data-first="desc">Last seen</th><th data-sort="text">Comments</th><th></th>
 </tr></thead>
 <tbody>
 {{range .Hosts}}
 <tr class="host-row status-{{.Status}}" data-search="{{.IP}} {{.HostnameDNS}} {{.HostnameOverride}} {{.MAC}} {{.Comments}} {{.Tags}} {{.Status}}">
 <td><input type="checkbox" class="host-check" form="bulk-form" name="host_ids" value="{{.ID}}" aria-label="select {{.IP}}"></td>
-<td><a href="/hosts/{{.ID}}"><code>{{.IP}}</code></a></td>
-<td>
-<span class="view-only">{{if .HostnameOverride}}{{.HostnameOverride}}{{else if .HostnameDNS}}{{.HostnameDNS}}{{else}}<span class="dim">—</span>{{end}}</span>
+<td data-v="{{ipKey .IP}}"><a href="/hosts/{{.ID}}"><code>{{.IP}}</code></a></td>
+<td class="clip" data-v="{{if .HostnameOverride}}{{.HostnameOverride}}{{else}}{{.HostnameDNS}}{{end}}" title="{{if .HostnameOverride}}{{.HostnameOverride}}{{if .HostnameDNS}} (DNS: {{.HostnameDNS}}){{end}}{{else}}{{.HostnameDNS}}{{end}}">
+<span class="view-only">{{if .HostnameOverride}}{{.HostnameOverride}}{{if .HostnameDNS}} <span class="muted">{{.HostnameDNS}}</span>{{end}}{{else if .HostnameDNS}}{{.HostnameDNS}}{{else}}<span class="dim">—</span>{{end}}</span>
 <input class="edit-only" form="hf-{{.ID}}" name="hostname_override" value="{{.HostnameOverride}}" placeholder="{{if .HostnameDNS}}{{.HostnameDNS}}{{else}}(no DNS){{end}}" aria-label="hostname override for {{.IP}}">
-{{if and .HostnameOverride .HostnameDNS}}<div class="sub">DNS: {{.HostnameDNS}}</div>{{end}}
 </td>
-<td>{{if .MAC}}<code>{{.MAC}}</code>{{end}}</td>
+<td class="col-muted">{{if .MAC}}<code>{{.MAC}}</code>{{end}}</td>
 <td><span class="status status-{{.Status}}"><i class="led"></i>{{.Status}}</span></td>
-<td class="tag-cell">{{range fields .Tags}}<span class="tag">{{.}}</span>{{end}}</td>
-<td>{{relTime .LastSeen}}</td>
-<td>
+<td class="clip tag-cell" data-v="{{.Tags}}" title="{{.Tags}}">{{range fields .Tags}}<span class="tag">{{.}}</span>{{end}}</td>
+<td data-v="{{if .LastSeen}}{{.LastSeen}}{{end}}">{{relTime .LastSeen}}</td>
+<td class="clip grow" data-v="{{.Comments}}" title="{{.Comments}}">
 <span class="view-only">{{if .Comments}}{{.Comments}}{{else}}<span class="dim">—</span>{{end}}</span>
 <input class="edit-only" form="hf-{{.ID}}" name="comments" value="{{.Comments}}" aria-label="comments for {{.IP}}">
 </td>

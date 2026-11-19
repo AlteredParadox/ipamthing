@@ -57,8 +57,8 @@
 
   /* density knobs */
   --root-size: 13px;
-  --row-y: 7px;
-  --row-x: 12px;
+  --row-h: 30px;
+  --row-x: 10px;
   --gap: 14px;
   --main-pad: 22px 28px 40px;
   --ctl-y: 6px;
@@ -87,8 +87,7 @@
 
 :root[data-density="compact"] {
   --root-size: 12px;
-  --row-y: 3px;
-  --row-x: 10px;
+  --row-h: 25px;
   --gap: 10px;
   --main-pad: 14px 18px 28px;
   --ctl-y: 4px;
@@ -133,7 +132,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.primary:hover { filter: brightness(1.1); color: var(--accent-ink); }
 button.danger { color: var(--bad); }
 button.danger:hover { border-color: var(--bad); color: var(--bad); }
-button.small { padding: 3px 9px; font-size: 0.846rem; }
+button.small { padding: 1px 8px; font-size: 0.846rem; }
 
 /* Radio group drawn as a segmented control; the inputs stay in the DOM
    (and keyboard-reachable) but are visually replaced by their <span>. */
@@ -231,7 +230,6 @@ h2 a { letter-spacing: 0; text-transform: none; }
 .warn { color: var(--warn); }
 .bad { color: var(--bad); }
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
-.sub { margin-top: 2px; font-size: 0.846rem; color: var(--muted); }
 .hint { font-size: 0.846rem; color: var(--muted); }
 .err-inline { color: var(--bad); font-weight: 700; cursor: help; }
 .more { margin: 10px 0 0; font-size: 0.923rem; }
@@ -243,22 +241,52 @@ h2 a { letter-spacing: 0; text-transform: none; }
 
 .table { border: 1px solid var(--line); border-radius: 4px; background: var(--panel); overflow-x: auto; }
 .table + .hint { margin-top: 8px; }
-/* min-width: on a phone the .table wrapper scrolls sideways rather than
-   wrapping every cell into a column of single words. */
-table { width: 100%; min-width: 600px; border-collapse: collapse; font-size: 0.923rem; }
-th, td { padding: var(--row-y) var(--row-x); text-align: left; vertical-align: middle; border-bottom: 1px solid var(--line); }
+/* Table layout and sizing follow idlerthing's server inventory: every row
+   is one line at a fixed height, cells never wrap (long text is clipped
+   with an ellipsis and kept in the title), and the header is a small
+   uppercase strip on its own shade. On a narrow screen the .table wrapper
+   scrolls sideways. */
+table { width: 100%; border-collapse: collapse; font-size: 1rem; }
+th, td { text-align: left; vertical-align: middle; white-space: nowrap; border-bottom: 1px solid var(--line); }
 th {
-  padding-top: calc(var(--row-y) + 1px); padding-bottom: calc(var(--row-y) + 1px);
-  font-size: 0.808rem; font-weight: 500; color: var(--muted);
-  text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+  padding: 4px var(--row-x); background: var(--panel2);
+  font-size: 0.77rem; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.07em;
 }
+td { height: var(--row-h); padding: 0 var(--row-x); }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: var(--panel2); }
-td.empty-row { padding: 28px var(--row-x); text-align: center; color: var(--muted); }
+td.empty-row { height: auto; padding: 28px var(--row-x); text-align: center; white-space: normal; color: var(--muted); }
 tbody tr:hover:has(td.empty-row) { background: none; }
-.empty { padding: 32px; text-align: center; color: var(--muted); border: 1px dashed var(--line); border-radius: 4px; }
+td.clip { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+/* The one free-text column per table takes whatever width is left over and
+   clips to it; the min-width keeps it usable when the wrapper scrolls. */
+td.clip.grow { width: 100%; max-width: 0; min-width: 140px; }
+/* app.js marks a cell .clipped when its text really is cut off and makes it
+   a toggle; .expanded wraps the full text in place, so reading it never
+   depends on a hover tooltip. */
+td.clip.clipped { cursor: pointer; }
+td.clip.clipped:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+td.clip.expanded { padding-top: 6px; padding-bottom: 6px; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
+table:has(td.grow) { min-width: 760px; }
+.hosts-table:has(td.grow) { min-width: 1000px; }
+td.col-muted { color: var(--muted); }
 
-.events-table td:first-child { white-space: nowrap; color: var(--muted); }
+/* Links inside a table read as plain text until hovered. */
+td a { color: var(--text); }
+td a:hover { color: var(--accent-hover); text-decoration: underline; }
+
+/* Sortable headers: app.js wraps each th[data-sort] label in this button. */
+button.th-sort {
+  display: inline-flex; align-items: center; padding: 0; border: 0; border-radius: 0;
+  background: none; color: inherit; font: inherit; line-height: inherit;
+  text-transform: inherit; letter-spacing: inherit;
+}
+button.th-sort:hover { color: var(--text); }
+button.th-sort .arrow { display: inline-block; width: 1ch; margin-left: 5px; letter-spacing: 0; }
+th.sorted button.th-sort, th.sorted .arrow { color: var(--accent); }
+
+.events-table td:first-child { color: var(--muted); }
 
 .thead-tools {
   display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
@@ -273,26 +301,20 @@ tbody tr:hover:has(td.empty-row) { background: none; }
 
 .hosts-table th:first-child, .hosts-table td:first-child { width: 1%; padding-right: 2px; }
 .hosts-table input[type="checkbox"] { display: block; }
-.hosts-table input:not([type="checkbox"]) { padding: 2px 7px; font-size: 1em; min-width: 120px; }
-/* Wide enough that no column is crushed; the .table wrapper scrolls on
-   narrow screens instead. */
-.hosts-table { min-width: 900px; }
-/* hostname and comments are free text and may wrap anywhere; the rest stay on one line */
-.hosts-table td:nth-child(3), .hosts-table td:nth-child(8) { overflow-wrap: anywhere; }
-.hosts-table td:nth-child(2), .hosts-table td:nth-child(4), .hosts-table td:nth-child(7) { white-space: nowrap; }
+/* inline-edit fields sit inside the fixed row height */
+.hosts-table input:not([type="checkbox"]) { height: 22px; padding: 0 7px; font-size: 1em; min-width: 140px; }
 tr.status-down td, tr.status-down td a { color: var(--muted); }
 td.tag-cell { max-width: 220px; }
 td.row-actions { width: 1%; }
-.acts { display: flex; justify-content: flex-end; align-items: center; gap: 6px; white-space: nowrap; }
-.row-link { margin-left: 6px; font-size: 0.846rem; color: var(--muted); }
-.row-link:hover { color: var(--text); }
+.acts { display: flex; justify-content: flex-end; align-items: center; gap: 6px; }
+.row-link, td a.row-link { margin-left: 6px; font-size: 0.846rem; color: var(--muted); }
+.row-link:hover, td a.row-link:hover { color: var(--text); }
 
 /* host row view/edit toggle (app.js adds .editing) */
 tr.host-row .edit-only { display: none; }
 tr.host-row.editing .view-only { display: none; }
 tr.host-row.editing input.edit-only { display: block; }
 tr.host-row.editing button.edit-only { display: inline-block; }
-tr.host-row span.view-only { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ---- status, tags, meters --------------------------------------------- */
 
@@ -315,14 +337,17 @@ tr.host-row span.view-only { white-space: pre-wrap; overflow-wrap: anywhere; }
 .tag.event-mac_changed,
 .tag.event-hostname_changed { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 50%, transparent); }
 
+/* "up / total" with a thin bar after it; the fixed-width fraction keeps
+   the bars in one column. */
+.frac { display: inline-block; min-width: 9ch; }
 progress.meter {
   -webkit-appearance: none; appearance: none;
-  display: block; width: 100%; max-width: 110px; height: 4px; margin-top: 3px;
+  display: inline-block; vertical-align: middle; width: 56px; height: 3px;
   border: 0; border-radius: 2px; background: var(--line); overflow: hidden;
 }
 progress.meter::-webkit-progress-bar { background: var(--line); }
-progress.meter::-webkit-progress-value { background: var(--accent); }
-progress.meter::-moz-progress-bar { background: var(--accent); }
+progress.meter::-webkit-progress-value { background: var(--ok); }
+progress.meter::-moz-progress-bar { background: var(--ok); }
 
 /* ---- forms ------------------------------------------------------------ */
 
@@ -379,7 +404,7 @@ label.f { display: grid; gap: 5px; font-size: 0.846rem; color: var(--muted); }
   }
   aside nav { flex-direction: row; flex-wrap: wrap; }
   .brand { padding: 2px 8px; }
-  .nav { width: auto; }
+  .nav { width: auto; padding: 6px 8px; }
   /* The license and source links stay reachable at every width. */
   .side-foot { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-top: 4px; padding: 6px 8px 0; }
   .spacer { display: none; }

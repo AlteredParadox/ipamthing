@@ -26,19 +26,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <div class="table">
 <table class="events-table">
 <thead><tr>
-<th>When</th><th>Subnet</th><th>Host</th><th>Event</th><th>Details</th>
+<th data-sort="num" data-first="desc">When</th><th data-sort="key">Subnet</th><th data-sort="key">Host</th><th data-sort="text">Event</th><th data-sort="text">Details</th>
 </tr></thead>
 <tbody>
 {{range .Events}}
 <tr>
-<td>{{relTime .TS}}</td>
-<td><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
-<td>
+<td data-v="{{.TS}}">{{relTime .TS}}</td>
+<td data-v="{{ipKey .SubnetCIDR}}"><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
+<td data-v="{{ipKey .IP}}">
 <a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>
 {{if .EffectiveHostname}}<span class="muted"> {{.EffectiveHostname}}</span>{{end}}
 </td>
 <td><span class="tag event-{{.Event}}">{{.Event}}</span></td>
-<td>{{if .Details}}<code class="muted">{{.Details}}</code>{{end}}</td>
+<td class="clip grow" title="{{.Details}}">{{if .Details}}<code class="muted">{{.Details}}</code>{{end}}</td>
 </tr>
 {{end}}
 </tbody>

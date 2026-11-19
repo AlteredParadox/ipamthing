@@ -38,18 +38,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <div class="table">
 <table>
 <thead><tr>
-<th>CIDR</th><th>Name</th><th>Hosts</th><th>Up</th><th>Scanning</th><th>Interval</th><th>Last scan</th>
+<th data-sort="key">CIDR</th><th data-sort="text">Name</th><th data-sort="num">Hosts</th><th data-sort="num">Up</th><th data-sort="text">Scanning</th><th data-sort="num">Interval</th><th data-sort="num" data-first="desc">Last scan</th>
 </tr></thead>
 <tbody>
 {{range .Subnets}}
 <tr>
-<td><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
-<td>{{.Name}}</td>
+<td data-v="{{ipKey .CIDR}}"><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
+<td class="clip">{{.Name}}</td>
 <td class="num">{{.Hosts}}</td>
-<td class="num">{{.Up}}{{if .Hosts}} <span class="muted">/ {{.Hosts}}</span><progress class="meter" max="{{.Hosts}}" value="{{.Up}}"></progress>{{end}}</td>
+<td class="num" data-v="{{.Up}}"><span class="frac">{{.Up}} <span class="muted">/ {{.Hosts}}</span></span><progress class="meter" max="{{if .Hosts}}{{.Hosts}}{{else}}1{{end}}" value="{{.Up}}" aria-label="{{.Up}} of {{.Hosts}} up"></progress></td>
 <td>{{if .ScanEnabled}}<span class="ok">on</span>{{else}}<span class="dim">off</span>{{end}}</td>
-<td class="num">{{.ScanIntervalSec}}s</td>
-<td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
+<td class="num" data-v="{{.ScanIntervalSec}}">{{.ScanIntervalSec}}s</td>
+<td data-v="{{if .LastScanAt}}{{.LastScanAt}}{{end}}">{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
 </tr>
 {{else}}
 <tr><td colspan="7" class="empty-row">No subnets yet. <a href="/subnets">Add one</a>.</td></tr>
@@ -62,13 +62,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 {{if .RecentEvents}}
 <div class="table">
 <table class="events-table">
-<thead><tr><th>When</th><th>Subnet</th><th>Host</th><th>Event</th></tr></thead>
+<thead><tr><th data-sort="num" data-first="desc">When</th><th data-sort="key">Subnet</th><th data-sort="key">Host</th><th data-sort="text">Event</th></tr></thead>
 <tbody>
 {{range .RecentEvents}}
 <tr>
-<td>{{relTime .TS}}</td>
-<td><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
-<td><a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>{{if .EffectiveHostname}} <span class="muted">{{.EffectiveHostname}}</span>{{end}}</td>
+<td data-v="{{.TS}}">{{relTime .TS}}</td>
+<td data-v="{{ipKey .SubnetCIDR}}"><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
+<td data-v="{{ipKey .IP}}"><a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>{{if .EffectiveHostname}} <span class="muted">{{.EffectiveHostname}}</span>{{end}}</td>
 <td><span class="tag event-{{.Event}}">{{.Event}}</span></td>
 </tr>
 {{end}}
