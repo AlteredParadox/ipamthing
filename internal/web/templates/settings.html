@@ -17,34 +17,49 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */}}
 
 {{define "content"}}
-<h1>Settings</h1>
+<div class="head">
+<div><div class="eyebrow">account</div><h1>Settings</h1></div>
+</div>
 
-<form method="post" action="/settings" class="settings-form">
+<form method="post" action="/settings" class="settings">
 {{template "csrf" .}}
+<div class="panel">
+<div class="tile-label">appearance</div>
 
-<label>Theme
-<select name="theme">
-<option value="light" {{if eq .Prefs.Theme "light"}}selected{{end}}>Light</option>
-<option value="dark" {{if eq .Prefs.Theme "dark"}}selected{{end}}>Dark</option>
-</select>
-<div class="field-help">Saved to your account — follows you across browsers and devices.</div>
-</label>
+<div class="row">
+<div>
+<div>theme</div>
+<div class="hint">Saved to your account — follows you across browsers and devices.</div>
+</div>
+<div class="seg">
+<label><input type="radio" name="theme" value="dark" {{if eq .Prefs.Theme "dark"}}checked{{end}}><span>dark</span></label>
+<label><input type="radio" name="theme" value="light" {{if eq .Prefs.Theme "light"}}checked{{end}}><span>light</span></label>
+</div>
+</div>
 
-<label class="checkbox-row">
-<input type="checkbox" name="full_width" value="1" {{if eq .Prefs.Layout "wide"}}checked{{end}}>
-Full-width layout
-</label>
-<div class="field-help">Removes the 1200px max width so tables use the full browser width.</div>
+<div class="row">
+<div>
+<div>layout</div>
+<div class="hint">Full width drops the max content width so tables use the whole window.</div>
+</div>
+<div class="seg">
+<label><input type="radio" name="full_width" value="" {{if ne .Prefs.Layout "wide"}}checked{{end}}><span>fixed</span></label>
+<label><input type="radio" name="full_width" value="1" {{if eq .Prefs.Layout "wide"}}checked{{end}}><span>full width</span></label>
+</div>
+</div>
 
-<label>Density
-<select name="density">
-<option value="standard" {{if eq .Prefs.Density "standard"}}selected{{end}}>Standard</option>
-<option value="compact" {{if eq .Prefs.Density "compact"}}selected{{end}}>Compact</option>
-</select>
-<div class="field-help">Compact shrinks the top bar and table row padding for more data on screen.</div>
-</label>
+<div class="row">
+<div>
+<div>density</div>
+<div class="hint">Compact shrinks text and row padding for more data on screen.</div>
+</div>
+<div class="seg">
+<label><input type="radio" name="density" value="standard" {{if eq .Prefs.Density "standard"}}checked{{end}}><span>standard</span></label>
+<label><input type="radio" name="density" value="compact" {{if eq .Prefs.Density "compact"}}checked{{end}}><span>compact</span></label>
+</div>
+</div>
+</div>
 
-<button type="submit">Save</button>
-
+<div class="form-foot"><button type="submit" class="primary">save</button></div>
 </form>
 {{end}}

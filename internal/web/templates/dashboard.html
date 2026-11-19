@@ -18,14 +18,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 {{define "content"}}
 {{with .Data}}
-<h1>Dashboard</h1>
+<div class="head">
+<div><div class="eyebrow">overview</div><h1>Dashboard</h1></div>
+</div>
 
-<div class="cards">
-<div class="card"><div class="card-num">{{.Totals.Subnets}}</div><div class="card-label">subnets</div></div>
-<div class="card"><div class="card-num">{{.Totals.Hosts}}</div><div class="card-label">hosts tracked</div></div>
-<div class="card card-up"><div class="card-num">{{.Totals.Up}}</div><div class="card-label">up</div></div>
-<div class="card card-down"><div class="card-num">{{.Totals.Down}}</div><div class="card-label">down</div></div>
-<div class="card"><div class="card-num">{{.Totals.Events24h}}</div><div class="card-label">events (24h)</div></div>
+<div class="strip">
+<div><div class="tile-label">subnets</div><div class="tile-value">{{.Totals.Subnets}}</div></div>
+<div><div class="tile-label">hosts tracked</div><div class="tile-value">{{.Totals.Hosts}}</div></div>
+<div><div class="tile-label">up</div><div class="tile-value{{if .Totals.Up}} ok{{end}}">{{.Totals.Up}}</div></div>
+<div><div class="tile-label">down</div><div class="tile-value{{if .Totals.Down}} bad{{end}}">{{.Totals.Down}}</div></div>
+<div><div class="tile-label">events, last 24h</div><div class="tile-value">{{.Totals.Events24h}}</div></div>
 </div>
 
 {{if not .ICMPAvailable}}
@@ -33,6 +35,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 {{end}}
 
 <h2>Subnets</h2>
+<div class="table">
 <table>
 <thead><tr>
 <th>CIDR</th><th>Name</th><th>Hosts</th><th>Up</th><th>Scanning</th><th>Interval</th><th>Last scan</th>
@@ -42,20 +45,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <tr>
 <td><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
 <td>{{.Name}}</td>
-<td>{{.Hosts}}</td>
-<td>{{.Up}}{{if .Hosts}} <span class="muted">/ {{.Hosts}}</span>{{end}}</td>
-<td>{{if .ScanEnabled}}on{{else}}off{{end}}</td>
-<td>{{.ScanIntervalSec}}s</td>
+<td class="num">{{.Hosts}}</td>
+<td class="num">{{.Up}}{{if .Hosts}} <span class="muted">/ {{.Hosts}}</span><progress class="meter" max="{{.Hosts}}" value="{{.Up}}"></progress>{{end}}</td>
+<td>{{if .ScanEnabled}}<span class="ok">on</span>{{else}}<span class="dim">off</span>{{end}}</td>
+<td class="num">{{.ScanIntervalSec}}s</td>
 <td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
 </tr>
 {{else}}
-<tr><td colspan="7"><em>No subnets yet. <a href="/subnets">Add one</a>.</em></td></tr>
+<tr><td colspan="7" class="empty-row">No subnets yet. <a href="/subnets">Add one</a>.</td></tr>
 {{end}}
 </tbody>
 </table>
+</div>
 
-<h2>Recent activity <a href="/events" class="row-link">see all →</a></h2>
+<h2>Recent activity <a href="/events">see all →</a></h2>
 {{if .RecentEvents}}
+<div class="table">
 <table class="events-table">
 <thead><tr><th>When</th><th>Subnet</th><th>Host</th><th>Event</th></tr></thead>
 <tbody>
@@ -64,13 +69,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <td>{{relTime .TS}}</td>
 <td><a href="/subnets/{{.SubnetID}}"><code>{{.SubnetCIDR}}</code></a></td>
 <td><a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>{{if .EffectiveHostname}} <span class="muted">{{.EffectiveHostname}}</span>{{end}}</td>
-<td><span class="event-pill event-{{.Event}}">{{.Event}}</span></td>
+<td><span class="tag event-{{.Event}}">{{.Event}}</span></td>
 </tr>
 {{end}}
 </tbody>
 </table>
+</div>
 {{else}}
-<p><em>No events yet.</em></p>
+<div class="empty">No events yet.</div>
 {{end}}
 {{end}}
 {{end}}

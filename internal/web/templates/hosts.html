@@ -18,35 +18,37 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 {{define "content"}}
 {{with .Data}}
-<p class="breadcrumbs"><a href="/subnets">subnets</a> / <code>{{.Subnet.CIDR}}</code></p>
+<a class="crumb" href="/subnets">← subnets</a>
 
-<div class="subnet-header">
+<div class="head">
+<div>
 <h1>{{if .Subnet.Name}}{{.Subnet.Name}}{{else}}{{.Subnet.CIDR}}{{end}}</h1>
 <div class="meta">
-<span>CIDR: <code>{{.Subnet.CIDR}}</code></span>
-<span>scanning: {{if .Subnet.ScanEnabled}}on{{else}}off{{end}}</span>
-<span>interval: {{.Subnet.ScanIntervalSec}}s</span>
-<span>last scan: {{relTime .Subnet.LastScanAt}}</span>
+<span><code>{{.Subnet.CIDR}}</code></span>
+<span>scanning {{if .Subnet.ScanEnabled}}<b class="ok">on</b>{{else}}<b>off</b>{{end}}</span>
+<span>interval <b>{{.Subnet.ScanIntervalSec}}s</b></span>
+<span>last scan <b>{{relTime .Subnet.LastScanAt}}</b></span>
+</div>
 </div>
 <div class="actions">
-<form method="post" action="/subnets/{{.Subnet.ID}}/scan">{{template "csrf" $}}<button type="submit">Scan now</button></form>
 <form method="post" action="/subnets/{{.Subnet.ID}}/toggle">
 {{template "csrf" $}}
 <input type="hidden" name="redirect" value="/subnets/{{.Subnet.ID}}">
-<button type="submit" class="secondary">{{if .Subnet.ScanEnabled}}disable scanning{{else}}enable scanning{{end}}</button>
+<button type="submit">{{if .Subnet.ScanEnabled}}disable scanning{{else}}enable scanning{{end}}</button>
 </form>
-<a class="button-link secondary" href="/subnets/{{.Subnet.ID}}/export.csv">Export CSV</a>
+<a class="btn" href="/subnets/{{.Subnet.ID}}/export.csv">export csv</a>
+<form method="post" action="/subnets/{{.Subnet.ID}}/scan">{{template "csrf" $}}<button type="submit" class="primary">scan now</button></form>
 </div>
 </div>
 
 {{if .ScanQueued}}<div class="info">Scan queued. Refresh the page in a few seconds to see results.</div>{{end}}
 {{if not .ICMPAvailable}}<div class="info">ICMP scanning unavailable (needs CAP_NET_RAW or <code>net.ipv4.ping_group_range</code>). Using neighbor table + TCP probes only.</div>{{end}}
 
-<form method="post" action="/subnets/{{.Subnet.ID}}/edit" class="inline-form edit-meta">
+<form method="post" action="/subnets/{{.Subnet.ID}}/edit" class="panel inline-form">
 {{template "csrf" $}}
-<label>Name <input name="name" value="{{.Subnet.Name}}"></label>
-<label>Scan interval (s) <input name="scan_interval_sec" type="number" min="30" value="{{.Subnet.ScanIntervalSec}}"></label>
-<button type="submit" class="secondary">Save</button>
+<label class="f">name <input name="name" value="{{.Subnet.Name}}"></label>
+<label class="f">scan interval (s) <input name="scan_interval_sec" type="number" min="30" value="{{.Subnet.ScanIntervalSec}}"></label>
+<button type="submit">save</button>
 </form>
 
 <form id="bulk-form" method="post" action="/subnets/{{.Subnet.ID}}/hosts/bulk">
@@ -56,61 +58,63 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <input type="hidden" name="tags" id="bulk-tags" value="">
 </form>
 
-{{if .Hosts}}
-<div class="toolbar">
-<input type="text" id="host-filter" placeholder="filter by ip, hostname, mac, comment, tag…" aria-label="filter hosts">
-<span id="filter-count" class="muted"></span>
-</div>
-
-<div class="bulk-bar">
-<span id="bulk-count" class="muted">0 selected</span>
-<select id="bulk-action-select" aria-label="bulk action">
-<option value="">Bulk action…</option>
-<option value="set_comment">Set comment</option>
-<option value="set_tags">Set tags</option>
-<option value="delete">Delete</option>
-</select>
-<input type="text" id="bulk-value-input" placeholder="value (for comment / tags)">
-<button type="button" id="bulk-apply">Apply</button>
-</div>
-{{end}}
-
 {{range .Hosts}}<form id="hf-{{.ID}}" method="post" action="/hosts/{{.ID}}">{{template "csrf" $}}</form>{{end}}
 
+<div class="table">
+{{if .Hosts}}
+<div class="thead-tools">
+<div class="tools">
+<input type="text" id="host-filter" class="filter" placeholder="filter by ip, hostname, mac, comment, tag…" aria-label="filter hosts">
+<span id="filter-count" class="muted"></span>
+</div>
+<div class="tools bulk">
+<span id="bulk-count" class="muted">0 selected</span>
+<select id="bulk-action-select" aria-label="bulk action">
+<option value="">bulk action…</option>
+<option value="set_comment">set comment</option>
+<option value="set_tags">set tags</option>
+<option value="delete">delete</option>
+</select>
+<input type="text" id="bulk-value-input" placeholder="value (for comment / tags)" aria-label="bulk value">
+<button type="button" id="bulk-apply">apply</button>
+</div>
+</div>
+{{end}}
 <table class="hosts-table">
 <thead><tr>
 <th><input type="checkbox" id="select-all" aria-label="select all"></th>
-<th>IP</th><th>Hostname</th><th>MAC</th><th>Status</th><th>Tags</th><th>Last seen</th><th>Comments</th><th></th><th></th>
+<th>IP</th><th>Hostname</th><th>MAC</th><th>Status</th><th>Tags</th><th>Last seen</th><th>Comments</th><th></th>
 </tr></thead>
 <tbody>
 {{range .Hosts}}
 <tr class="host-row status-{{.Status}}" data-search="{{.IP}} {{.HostnameDNS}} {{.HostnameOverride}} {{.MAC}} {{.Comments}} {{.Tags}} {{.Status}}">
 <td><input type="checkbox" class="host-check" form="bulk-form" name="host_ids" value="{{.ID}}" aria-label="select {{.IP}}"></td>
-<td><code>{{.IP}}</code></td>
+<td><a href="/hosts/{{.ID}}"><code>{{.IP}}</code></a></td>
 <td>
-<span class="view-only">{{if .HostnameOverride}}{{.HostnameOverride}}{{else if .HostnameDNS}}{{.HostnameDNS}}{{else}}<span class="muted">—</span>{{end}}</span>
-<input class="edit-only" form="hf-{{.ID}}" name="hostname_override" value="{{.HostnameOverride}}" placeholder="{{if .HostnameDNS}}{{.HostnameDNS}}{{else}}(no DNS){{end}}">
-{{if and .HostnameOverride .HostnameDNS}}<div class="muted">DNS: {{.HostnameDNS}}</div>{{end}}
+<span class="view-only">{{if .HostnameOverride}}{{.HostnameOverride}}{{else if .HostnameDNS}}{{.HostnameDNS}}{{else}}<span class="dim">—</span>{{end}}</span>
+<input class="edit-only" form="hf-{{.ID}}" name="hostname_override" value="{{.HostnameOverride}}" placeholder="{{if .HostnameDNS}}{{.HostnameDNS}}{{else}}(no DNS){{end}}" aria-label="hostname override for {{.IP}}">
+{{if and .HostnameOverride .HostnameDNS}}<div class="sub">DNS: {{.HostnameDNS}}</div>{{end}}
 </td>
 <td>{{if .MAC}}<code>{{.MAC}}</code>{{end}}</td>
-<td><span class="status-pill status-{{.Status}}">{{.Status}}</span></td>
-<td class="tag-cell">{{range fields .Tags}}<span class="tag-pill">{{.}}</span>{{end}}</td>
+<td><span class="status status-{{.Status}}"><i class="led"></i>{{.Status}}</span></td>
+<td class="tag-cell">{{range fields .Tags}}<span class="tag">{{.}}</span>{{end}}</td>
 <td>{{relTime .LastSeen}}</td>
 <td>
-<span class="view-only">{{if .Comments}}{{.Comments}}{{else}}<span class="muted">—</span>{{end}}</span>
-<input class="edit-only" form="hf-{{.ID}}" name="comments" value="{{.Comments}}">
+<span class="view-only">{{if .Comments}}{{.Comments}}{{else}}<span class="dim">—</span>{{end}}</span>
+<input class="edit-only" form="hf-{{.ID}}" name="comments" value="{{.Comments}}" aria-label="comments for {{.IP}}">
 </td>
-<td>
-<button type="button" class="edit-btn secondary view-only">Edit</button>
-<button form="hf-{{.ID}}" type="submit" class="edit-only">Save</button>
-</td>
-<td><a href="/hosts/{{.ID}}" class="row-link">history</a></td>
+<td class="row-actions"><div class="acts">
+<button type="button" class="edit-btn small view-only">edit</button>
+<button form="hf-{{.ID}}" type="submit" class="small primary edit-only">save</button>
+<a href="/hosts/{{.ID}}" class="row-link">history</a>
+</div></td>
 </tr>
 {{else}}
-<tr><td colspan="10"><em>No hosts yet. Click "Scan now" to discover hosts on {{.Subnet.CIDR}}.</em></td></tr>
+<tr><td colspan="9" class="empty-row">No hosts yet. Click "scan now" to discover hosts on {{.Subnet.CIDR}}.</td></tr>
 {{end}}
 </tbody>
 </table>
+</div>
 
 {{end}}
 {{end}}

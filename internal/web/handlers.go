@@ -125,6 +125,11 @@ type pageData struct {
 	Data   any
 	Prefs  userPrefs
 	CSRF   string
+	// Nav names the sidebar entry to highlight; Bare drops the sidebar
+	// entirely (login and first-run setup, where there is nothing to
+	// navigate to yet). Both are derived from the page name in render.
+	Nav  string
+	Bare bool
 	// Version is shown in the layout footer next to the license links.
 	Version string
 }
@@ -134,7 +139,7 @@ type pageData struct {
 // preference is a per-account property that follows the user across
 // browsers and machines.
 func (s *Server) readPrefs(r *http.Request) userPrefs {
-	p := userPrefs{Theme: "light", Layout: "normal", Density: "standard"}
+	p := userPrefs{Theme: "dark", Layout: "normal", Density: "standard"}
 	uid, ok := r.Context().Value(userIDKey).(int64)
 	if !ok || uid == 0 {
 		return p
@@ -146,8 +151,8 @@ func (s *Server) readPrefs(r *http.Request) userPrefs {
 	if err != nil {
 		return p
 	}
-	if theme == "dark" {
-		p.Theme = "dark"
+	if theme == "light" {
+		p.Theme = "light"
 	}
 	if layout == "wide" {
 		p.Layout = "wide"
@@ -158,6 +163,19 @@ func (s *Server) readPrefs(r *http.Request) userPrefs {
 	return p
 }
 
+// navFor maps a template name to the sidebar section it belongs to. The
+// subnet detail ("hosts") and single-host pages sit under subnets.
+func navFor(page string) (nav string, bare bool) {
+	switch page {
+	case "login", "setup":
+		return "", true
+	case "hosts", "host":
+		return "subnets", false
+	default:
+		return page, false
+	}
+}
+
 func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, data pageData) {
 	t, ok := s.tmpls[page]
 	if !ok {
@@ -165,6 +183,7 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, page string, dat
 		return
 	}
 	data.Prefs = s.readPrefs(r)
+	data.Nav, data.Bare = navFor(page)
 	data.CSRF = s.ensureCSRFCookie(w, r)
 	data.Version = s.Version()
 	w.Header().Set(headerContentType, "text/html; charset=utf-8")
@@ -244,7 +263,7 @@ func (s *Server) postSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := s.db.Exec(
-		`INSERT INTO users (username, password_hash, created_at) VALUES (?, ?, ?)`,
+		`INSERT INTO users (username, password_hash, ui_theme, created_at) VALUES (?, ?, 'dark', ?)`,
 		username, hash, time.Now().Unix(),
 	); err != nil {
 		s.render(w, r, "setup", pageData{Title: titleSetup, Flash: "failed to create user"})

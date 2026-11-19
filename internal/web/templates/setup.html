@@ -18,12 +18,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 {{define "content"}}
 <h1>Create admin account</h1>
-<p>No users exist yet. Create the first admin to continue. This requires the one-time setup token printed to the server log (or passed via <code>-setup-token</code>).</p>
-<form method="post" action="/setup">
+<p class="hint">No users exist yet. Create the first admin to continue. This requires the one-time setup token printed to the server log (or passed via <code>-setup-token</code>).</p>
+<form method="post" action="/setup" class="form">
 {{template "csrf" .}}
-<label>Setup token <input name="setup_token" required autofocus autocomplete="off"></label>
-<label>Username <input name="username" required></label>
-<label>Password (8+ chars) <input name="password" type="password" required minlength="8"></label>
-<button type="submit">Create admin</button>
+<label class="f">setup token <input name="setup_token" required autofocus autocomplete="off"></label>
+<label class="f">username <input name="username" required autocomplete="username"></label>
+<label class="f">password (8+ chars) <input name="password" type="password" required minlength="8" autocomplete="new-password"></label>
+<button type="submit" class="primary">create admin</button>
 </form>
 {{end}}

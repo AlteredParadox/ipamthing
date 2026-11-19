@@ -17,15 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */}}
 
 {{define "content"}}
-<h1>Subnets</h1>
-<form method="post" action="/subnets" class="inline-form">
+<div class="head">
+<div><div class="eyebrow">networks</div><h1>Subnets</h1></div>
+</div>
+
+<form method="post" action="/subnets" class="panel inline-form">
 {{template "csrf" .}}
-<label>CIDR <input name="cidr" placeholder="192.168.1.0/24" required></label>
-<label>Name <input name="name" placeholder="Home LAN"></label>
-<label>Scan interval (s) <input name="scan_interval_sec" type="number" value="300" min="30"></label>
-<button type="submit">Add subnet</button>
+<label class="f">cidr <input name="cidr" placeholder="192.168.1.0/24" required></label>
+<label class="f">name <input name="name" placeholder="Home LAN"></label>
+<label class="f">scan interval (s) <input name="scan_interval_sec" type="number" value="300" min="30"></label>
+<button type="submit" class="primary">+ add subnet</button>
 </form>
 
+<div class="table">
 <table>
 <thead><tr><th>CIDR</th><th>Name</th><th>Scanning</th><th>Interval</th><th>Last scan</th><th></th></tr></thead>
 <tbody>
@@ -33,24 +37,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <tr>
 <td><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
 <td>{{.Name}}</td>
-<td>
-<form method="post" action="/subnets/{{.ID}}/toggle" class="row-action">
+<td>{{if .ScanEnabled}}<span class="ok">on</span>{{else}}<span class="dim">off</span>{{end}}</td>
+<td class="num">{{.ScanIntervalSec}}s</td>
+<td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
+<td class="row-actions"><div class="acts">
+<form method="post" action="/subnets/{{.ID}}/toggle">
 {{template "csrf" $}}
-<button type="submit" class="{{if .ScanEnabled}}secondary{{end}}">{{if .ScanEnabled}}disable{{else}}enable{{end}}</button>
+<button type="submit" class="small">{{if .ScanEnabled}}disable{{else}}enable{{end}}</button>
 </form>
-</td>
-<td>{{.ScanIntervalSec}}s</td>
-<td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline">!</span>{{end}}</td>
-<td>
-<form method="post" action="/subnets/{{.ID}}/delete" class="row-action" data-confirm="Delete {{.CIDR}}?">
+<form method="post" action="/subnets/{{.ID}}/delete" data-confirm="Delete {{.CIDR}}?">
 {{template "csrf" $}}
-<button type="submit" class="danger">Delete</button>
+<button type="submit" class="small danger">delete</button>
 </form>
-</td>
+</div></td>
 </tr>
 {{else}}
-<tr><td colspan="6"><em>No subnets yet. Add one above.</em></td></tr>
+<tr><td colspan="6" class="empty-row">No subnets yet. Add one above.</td></tr>
 {{end}}
 </tbody>
 </table>
+</div>
 {{end}}

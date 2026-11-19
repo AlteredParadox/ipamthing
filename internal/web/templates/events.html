@@ -18,11 +18,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 {{define "content"}}
 {{with .Data}}
-<div class="row-between">
-<h1>Recent activity</h1>
-<a href="/events/export.csv" class="button-link secondary">Export CSV</a>
+<div class="head">
+<div><div class="eyebrow">scan log</div><h1>Recent activity</h1></div>
+<div class="actions"><a href="/events/export.csv" class="btn">export csv</a></div>
 </div>
 {{if .Events}}
+<div class="table">
 <table class="events-table">
 <thead><tr>
 <th>When</th><th>Subnet</th><th>Host</th><th>Event</th><th>Details</th>
@@ -36,17 +37,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <a href="/hosts/{{.HostID}}"><code>{{.IP}}</code></a>
 {{if .EffectiveHostname}}<span class="muted"> {{.EffectiveHostname}}</span>{{end}}
 </td>
-<td><span class="event-pill event-{{.Event}}">{{.Event}}</span></td>
-<td>{{if .Details}}<code>{{.Details}}</code>{{end}}</td>
+<td><span class="tag event-{{.Event}}">{{.Event}}</span></td>
+<td>{{if .Details}}<code class="muted">{{.Details}}</code>{{end}}</td>
 </tr>
 {{end}}
 </tbody>
 </table>
+</div>
 {{if .HasMore}}
-<p><a href="/events?before={{.NextCursor}}" class="row-link">older events →</a></p>
+<p class="more"><a href="/events?before={{.NextCursor}}">older events →</a></p>
 {{end}}
 {{else}}
-<p><em>No events yet. Scan a subnet to generate some.</em></p>
+<div class="empty">No events yet. Scan a subnet to generate some.</div>
 {{end}}
 {{end}}
 {{end}}
