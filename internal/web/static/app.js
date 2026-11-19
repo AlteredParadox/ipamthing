@@ -70,11 +70,25 @@
       });
     });
 
+    // Whether a cell is cut off depends on its column's width and its own
+    // content, and both move without any window resize: the web font
+    // swapping in after first paint (font-display: swap), the filter hiding
+    // rows, a row entering edit mode (which swaps the text for an input).
+    // So re-measure when the fonts settle, whenever a clip cell changes
+    // size, and after any click or typing on the page, not only on resize.
     let timer = null;
-    window.addEventListener('resize', function () {
+    function schedule() {
       clearTimeout(timer);
       timer = setTimeout(measure, 150);
-    });
+    }
+    window.addEventListener('resize', schedule);
+    document.addEventListener('click', schedule);
+    document.addEventListener('input', schedule);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    if (typeof ResizeObserver === 'function') {
+      const observer = new ResizeObserver(schedule);
+      cells.forEach(function (td) { observer.observe(td); });
+    }
     measure();
   }
 
