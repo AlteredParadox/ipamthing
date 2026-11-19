@@ -37,7 +37,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <tr>
 <td data-v="{{ipKey .CIDR}}"><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
 <td class="clip">{{.Name}}</td>
-<td>{{if .ScanEnabled}}<span class="ok">on</span>{{else}}<span class="dim">off</span>{{end}}</td>
+<td>{{if .ScanEnabled}}<span class="ok">on</span>{{else}}<span class="muted">off</span>{{end}}</td>
 <td class="num" data-v="{{.ScanIntervalSec}}">{{.ScanIntervalSec}}s</td>
 <td data-v="{{if .LastScanAt}}{{.LastScanAt}}{{end}}">{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
 <td class="row-actions"><div class="acts">

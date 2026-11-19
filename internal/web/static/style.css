@@ -44,6 +44,11 @@
   --dim: #5a6272;
   --accent: #3b82f6;
   --accent-hover: #60a5fa;
+  /* Filled controls carry small white text, which needs 4.5:1. The accent
+     itself gives only 3.7:1 against white, so fills use a deeper blue
+     (5.2:1, 4.8:1 on hover) and --accent stays for text, lines and glows. */
+  --accent-fill: #2563eb;
+  --accent-fill-hover: #2a6fdb;
   --accent-ink: #ffffff;
   --ok: #22c55e;
   --warn: #f59e0b;
@@ -76,6 +81,8 @@
   --dim: #8b93a3;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
+  --accent-fill: #2563eb;
+  --accent-fill-hover: #1d4ed8;
   --ok: #15803d;
   --warn: #b45309;
   --bad: #dc2626;
@@ -117,7 +124,9 @@ input, select, textarea {
 }
 input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-color: var(--accent); }
 input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); outline-offset: 0; }
-input::placeholder, textarea::placeholder { color: var(--dim); }
+/* Placeholders carry real hints (the CIDR format, what the bulk value is
+   for), so they get readable contrast, not --dim. */
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 textarea { resize: vertical; }
 
 button, a.btn {
@@ -128,8 +137,8 @@ button, a.btn {
 }
 button:hover, a.btn:hover { border-color: var(--accent); color: var(--text); text-decoration: none; }
 button:focus-visible, a:focus-visible { outline: 1px solid var(--accent); outline-offset: 1px; }
-button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-button.primary:hover { filter: brightness(1.1); color: var(--accent-ink); }
+button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-ink); font-weight: 600; }
+button.primary:hover { background: var(--accent-fill-hover); border-color: var(--accent-fill-hover); color: var(--accent-ink); }
 button.danger { color: var(--bad); }
 button.danger:hover { border-color: var(--bad); color: var(--bad); }
 button.small { padding: 1px 8px; font-size: 0.846rem; }
@@ -142,7 +151,7 @@ button.small { padding: 1px 8px; font-size: 0.846rem; }
 .seg input { position: absolute; opacity: 0; pointer-events: none; }
 .seg span { display: block; padding: var(--ctl-y) 12px; font-size: 0.923rem; color: var(--muted); white-space: nowrap; }
 .seg span:hover { color: var(--text); }
-.seg input:checked + span { background: var(--accent); color: var(--accent-ink); }
+.seg input:checked + span { background: var(--accent-fill); color: var(--accent-ink); }
 .seg input:focus-visible + span { outline: 1px solid var(--text); outline-offset: -3px; }
 
 /* ---- frame ------------------------------------------------------------ */
@@ -176,7 +185,7 @@ a.brand:hover { color: var(--text); text-decoration: none; }
 
 .side-foot {
   display: grid; gap: 4px; margin-top: 10px; padding: 12px 10px 0;
-  border-top: 1px solid var(--line); font-size: 0.846rem; color: var(--dim);
+  border-top: 1px solid var(--line); font-size: 0.846rem; color: var(--muted);
 }
 .legal { display: flex; flex-wrap: wrap; gap: 4px 12px; }
 .legal a { color: var(--muted); }
@@ -225,6 +234,8 @@ h2 a { letter-spacing: 0; text-transform: none; }
 .tile-value { margin-top: 2px; font-size: 1.46rem; font-weight: 600; line-height: 1.3; font-variant-numeric: tabular-nums; }
 
 .muted { color: var(--muted); }
+/* --dim is under 3:1 on a panel: decoration only (empty-value dashes, the
+   unknown-status dot), never text that carries a state, a value or a hint. */
 .dim { color: var(--dim); }
 .ok { color: var(--ok); }
 .warn { color: var(--warn); }
@@ -322,7 +333,7 @@ tr.host-row.editing button.edit-only { display: inline-block; }
 .led.up, .status-up .led { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .led.down, .status-down .led { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
 .status { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
-.status.status-unknown { color: var(--dim); }
+.status.status-unknown { color: var(--muted); }
 
 .tag {
   display: inline-block; margin: 1px 4px 1px 0; padding: 1px 6px;
@@ -392,7 +403,7 @@ label.f { display: grid; gap: 5px; font-size: 0.846rem; color: var(--muted); }
 .login-card h1 { margin: 0; font-size: 1.15rem; }
 .login-card .flash, .login-card .info, .login-card p { margin: 0; }
 .login-card button { margin-top: 4px; padding-top: 8px; padding-bottom: 8px; }
-.bare > .legal { justify-content: center; font-size: 0.846rem; color: var(--dim); }
+.bare > .legal { justify-content: center; font-size: 0.846rem; color: var(--muted); }
 
 /* ---- narrow screens --------------------------------------------------- */
 
