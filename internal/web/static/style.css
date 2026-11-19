@@ -292,7 +292,7 @@ tr.host-row .edit-only { display: none; }
 tr.host-row.editing .view-only { display: none; }
 tr.host-row.editing input.edit-only { display: block; }
 tr.host-row.editing button.edit-only { display: inline-block; }
-tr.host-row span.view-only { white-space: pre-wrap; word-break: break-word; }
+tr.host-row span.view-only { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ---- status, tags, meters --------------------------------------------- */
 

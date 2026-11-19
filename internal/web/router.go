@@ -100,7 +100,10 @@ var funcMap = template.FuncMap{
 	},
 }
 
-func NewRouter(deps ServerDeps) http.Handler {
+// parseTemplates pairs every page template with the shared layout. It
+// panics on a parse error: the templates are embedded, so a bad one is a
+// build defect, not a runtime condition.
+func parseTemplates() map[string]*template.Template {
 	pages := []string{"setup", "login", "subnets", "hosts", "host", "events", "dashboard", "settings"}
 	tmpls := make(map[string]*template.Template, len(pages))
 	for _, p := range pages {
@@ -112,6 +115,11 @@ func NewRouter(deps ServerDeps) http.Handler {
 		))
 		tmpls[p] = t
 	}
+	return tmpls
+}
+
+func NewRouter(deps ServerDeps) http.Handler {
+	tmpls := parseTemplates()
 
 	s := &Server{
 		logger: deps.Logger, db: deps.DB, sessions: deps.Sessions,
