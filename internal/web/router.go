@@ -24,6 +24,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -76,10 +77,25 @@ type Server struct {
 	setupToken string
 }
 
+// ipSortKey turns an address or CIDR into a string whose byte order is its
+// numeric order, so the browser can sort an IP column with a plain string
+// compare (10.0.0.9 before 10.0.0.10, IPv4 before IPv6, a /16 before the /24
+// at the same base). Anything unparseable sorts as itself.
+func ipSortKey(s string) string {
+	if p, err := netip.ParsePrefix(s); err == nil {
+		return fmt.Sprintf("%x/%03d", p.Addr().As16(), p.Bits())
+	}
+	if a, err := netip.ParseAddr(s); err == nil {
+		return fmt.Sprintf("%x", a.As16())
+	}
+	return s
+}
+
 var funcMap = template.FuncMap{
 	"fields": func(s string) []string {
 		return strings.Fields(s)
 	},
+	"ipKey": ipSortKey,
 	"relTime": func(u int64) string {
 		if u == 0 {
 			return "never"

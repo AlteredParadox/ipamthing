@@ -31,15 +31,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <div class="table">
 <table>
-<thead><tr><th>CIDR</th><th>Name</th><th>Scanning</th><th>Interval</th><th>Last scan</th><th></th></tr></thead>
+<thead><tr><th data-sort="key">CIDR</th><th data-sort="text">Name</th><th data-sort="text">Scanning</th><th data-sort="num">Interval</th><th data-sort="num" data-first="desc">Last scan</th><th></th></tr></thead>
 <tbody>
 {{range .Data}}
 <tr>
-<td><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
-<td>{{.Name}}</td>
+<td data-v="{{ipKey .CIDR}}"><a href="/subnets/{{.ID}}"><code>{{.CIDR}}</code></a></td>
+<td class="clip">{{.Name}}</td>
 <td>{{if .ScanEnabled}}<span class="ok">on</span>{{else}}<span class="dim">off</span>{{end}}</td>
-<td class="num">{{.ScanIntervalSec}}s</td>
-<td>{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
+<td class="num" data-v="{{.ScanIntervalSec}}">{{.ScanIntervalSec}}s</td>
+<td data-v="{{if .LastScanAt}}{{.LastScanAt}}{{end}}">{{relTime .LastScanAt}}{{if .LastScanErr}} <span class="err-inline" title="{{.LastScanErr}}">!</span>{{end}}</td>
 <td class="row-actions"><div class="acts">
 <form method="post" action="/subnets/{{.ID}}/toggle">
 {{template "csrf" $}}

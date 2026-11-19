@@ -138,3 +138,52 @@ func TestRenderUnknownPage(t *testing.T) {
 		t.Errorf("status = %d, want 500", rec.Code)
 	}
 }
+
+// The browser sorts IP columns by comparing these keys as plain strings, so
+// their byte order has to be the addresses' numeric order.
+func TestIPSortKeyOrdersNumerically(t *testing.T) {
+	ordered := []string{
+		"10.0.0.2",
+		"10.0.0.9",
+		"10.0.0.10",
+		"10.0.1.0/16",
+		"10.0.1.0/24",
+		"192.168.1.1",
+		"192.168.1.100",
+		"2001:db8::1",
+		"2001:db8::a",
+		"2001:db8::10",
+	}
+	for i := 1; i < len(ordered); i++ {
+		a, b := ipSortKey(ordered[i-1]), ipSortKey(ordered[i])
+		if !(a < b) {
+			t.Errorf("ipSortKey(%q) = %q is not below ipSortKey(%q) = %q", ordered[i-1], a, ordered[i], b)
+		}
+	}
+	if got := ipSortKey("not-an-ip"); got != "not-an-ip" {
+		t.Errorf("unparseable input: got %q, want it unchanged", got)
+	}
+}
+
+// Every table header that can be sorted is marked for app.js, and the cells
+// under an IP column carry the server-built key rather than relying on text.
+func TestRenderSortableHeaders(t *testing.T) {
+	s := &Server{tmpls: parseTemplates(), version: "dev"}
+	rec := httptest.NewRecorder()
+	s.render(rec, httptest.NewRequest(http.MethodGet, "/", nil), "subnets", pageData{
+		Title: "Subnets",
+		Data:  []subnetRow{{ID: 1, CIDR: "10.0.0.0/24", Name: "lan", ScanEnabled: true, ScanIntervalSec: 300, LastScanAt: 1700000000}, {ID: 2, CIDR: "10.0.1.0/24"}},
+	})
+	body := rec.Body.String()
+	for _, want := range []string{
+		`<th data-sort="key">CIDR</th>`,
+		`<th data-sort="num" data-first="desc">Last scan</th>`,
+		`data-v="` + ipSortKey("10.0.0.0/24") + `"`,
+		`data-v="1700000000"`, // a real scan time sorts by its timestamp
+		`data-v=""`,           // "never" sorts as empty, i.e. last
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("subnets page: missing %q", want)
+		}
+	}
+}
