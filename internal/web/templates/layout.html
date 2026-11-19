@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 */}}
 
 {{define "csrf"}}<input type="hidden" name="csrf_token" value="{{.CSRF}}">{{end}}
+{{define "brand"}}<span class="led"></span><span class="name">ipam<span>thing</span></span>{{end}}
+{{define "legal"}}<a href="/license">license</a><a href="/third-party-licenses">third-party</a><a href="/source">source</a>{{end}}
 {{define "layout"}}<!doctype html>
 <html lang="en" data-theme="{{.Prefs.Theme}}" data-layout="{{.Prefs.Layout}}" data-density="{{.Prefs.Density}}">
 <head>
@@ -24,30 +26,46 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{.Title}} — ipamthing</title>
 <link rel="stylesheet" href="/static/style.css">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <script src="/static/app.js" defer></script>
 </head>
 <body>
-<header>
-<nav>
-<strong>ipamthing</strong>
-<a href="/">dashboard</a>
-<a href="/subnets">subnets</a>
-<a href="/events">events</a>
-<a href="/settings">settings</a>
-<form method="post" action="/logout" class="logout-form">{{template "csrf" .}}<button type="submit">logout</button></form>
-</nav>
-</header>
-<main>
+{{if .Bare}}
+<div class="bare">
+<main class="login-card">
+<div class="brand">{{template "brand" .}}</div>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 {{if .Notice}}<div class="info">{{.Notice}}</div>{{end}}
 {{template "content" .}}
 </main>
-<footer>
-<span>ipamthing {{.Version}}</span>
-<a href="/license">license</a>
-<a href="/third-party-licenses">third-party licenses</a>
-<a href="/source">source</a>
+<footer class="legal"><span>ipamthing {{.Version}}</span>{{template "legal" .}}</footer>
+</div>
+{{else}}
+<div class="app">
+<aside>
+<a class="brand" href="/">{{template "brand" .}}</a>
+<nav>
+<a class="nav{{if eq .Nav "dashboard"}} active{{end}}" href="/">dashboard</a>
+<a class="nav{{if eq .Nav "subnets"}} active{{end}}" href="/subnets">subnets</a>
+<a class="nav{{if eq .Nav "events"}} active{{end}}" href="/events">events</a>
+<a class="nav{{if eq .Nav "settings"}} active{{end}}" href="/settings">settings</a>
+</nav>
+<div class="spacer"></div>
+<form method="post" action="/logout" class="logout-form">{{template "csrf" .}}<button type="submit" class="nav">logout</button></form>
+<footer class="side-foot">
+<div class="legal">{{template "legal" .}}</div>
+<div class="version">ipamthing {{.Version}}</div>
 </footer>
+</aside>
+<main>
+<div class="page">
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+{{if .Notice}}<div class="info">{{.Notice}}</div>{{end}}
+{{template "content" .}}
+</div>
+</main>
+</div>
+{{end}}
 </body>
 </html>
 {{end}}

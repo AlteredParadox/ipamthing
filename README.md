@@ -252,10 +252,11 @@ login wall would defeat the offer:
 | Route | Serves |
 | --- | --- |
 | `/license` | the AGPL text embedded in this binary |
-| `/third-party-licenses` | every linked dependency's licence and notices |
+| `/third-party-licenses` | every linked dependency's licence and notices, plus the embedded JetBrains Mono font's |
 | `/source` | redirects to the Corresponding Source, pinned to the running version |
 
-They are linked from the page footer next to the version. A stamped release
+They are linked from the bottom of the sidebar (and under the sign-in card)
+next to the version. A stamped release
 points `/source` at its own tag, so the source you are offered is the source
 that is running; an unstamped build can only point at the repository.
 

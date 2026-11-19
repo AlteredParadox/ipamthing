@@ -18,60 +18,71 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 {{define "content"}}
 {{with .Data}}
-<p class="breadcrumbs">
-<a href="/subnets">subnets</a> /
+<p class="crumb">
+<a href="/subnets">← subnets</a> /
 <a href="/subnets/{{.Subnet.ID}}"><code>{{.Subnet.CIDR}}</code></a> /
 <code>{{.Host.IP}}</code>
 </p>
 
-<h1>
+<div class="head">
+<div>
+<h1 class="with-led"><i class="led {{.Host.Status}}"></i>
 {{if .Host.HostnameOverride}}{{.Host.HostnameOverride}}
 {{else if .Host.HostnameDNS}}{{.Host.HostnameDNS}}
 {{else}}{{.Host.IP}}{{end}}
 </h1>
+</div>
+</div>
 
-<dl class="host-facts">
-<dt>IP</dt><dd><code>{{.Host.IP}}</code></dd>
-<dt>Status</dt><dd><span class="status-pill status-{{.Host.Status}}">{{.Host.Status}}</span></dd>
-<dt>MAC</dt><dd>{{if .Host.MAC}}<code>{{.Host.MAC}}</code>{{else}}<span class="muted">—</span>{{end}}</dd>
-<dt>DNS</dt><dd>{{if .Host.HostnameDNS}}{{.Host.HostnameDNS}}{{else}}<span class="muted">—</span>{{end}}</dd>
-<dt>Tags</dt><dd>{{if .Host.Tags}}{{range fields .Host.Tags}}<span class="tag-pill">{{.}}</span>{{end}}{{else}}<span class="muted">—</span>{{end}}</dd>
-<dt>First seen</dt><dd>{{relTime .Host.FirstSeen}}</dd>
-<dt>Last seen</dt><dd>{{relTime .Host.LastSeen}}</dd>
+<div class="two">
+<div class="panel">
+<div class="tile-label">host</div>
+<dl class="rows">
+<div><dt>ip</dt><dd><code>{{.Host.IP}}</code></dd></div>
+<div><dt>status</dt><dd><span class="status status-{{.Host.Status}}"><i class="led"></i>{{.Host.Status}}</span></dd></div>
+<div><dt>mac</dt><dd>{{if .Host.MAC}}<code>{{.Host.MAC}}</code>{{else}}<span class="dim">—</span>{{end}}</dd></div>
+<div><dt>dns</dt><dd>{{if .Host.HostnameDNS}}{{.Host.HostnameDNS}}{{else}}<span class="dim">—</span>{{end}}</dd></div>
+<div><dt>tags</dt><dd>{{if .Host.Tags}}{{range fields .Host.Tags}}<span class="tag">{{.}}</span>{{end}}{{else}}<span class="dim">—</span>{{end}}</dd></div>
+<div><dt>first seen</dt><dd>{{relTime .Host.FirstSeen}}</dd></div>
+<div><dt>last seen</dt><dd>{{relTime .Host.LastSeen}}</dd></div>
 </dl>
+</div>
 
-<form method="post" action="/hosts/{{.Host.ID}}" class="host-edit-form">
+<form method="post" action="/hosts/{{.Host.ID}}" class="panel form">
 {{template "csrf" $}}
 <input type="hidden" name="redirect" value="/hosts/{{.Host.ID}}">
-<label>Hostname override
+<label class="f">hostname override
 <input name="hostname_override" value="{{.Host.HostnameOverride}}" placeholder="{{if .Host.HostnameDNS}}{{.Host.HostnameDNS}}{{else}}(no DNS){{end}}">
 </label>
-<label>Tags <small class="muted">space-separated</small>
+<label class="f">tags · space-separated
 <input name="tags" value="{{.Host.Tags}}" placeholder="e.g. production web-server">
 </label>
-<label>Comments
+<label class="f">comments
 <textarea name="comments" rows="3">{{.Host.Comments}}</textarea>
 </label>
-<button type="submit">Save</button>
+<div class="form-foot"><button type="submit" class="primary">save</button></div>
 </form>
+</div>
 
 <h2>Scan history</h2>
 {{if .Events}}
+<div class="table">
 <table class="events-table">
 <thead><tr><th>When</th><th>Event</th><th>Details</th></tr></thead>
 <tbody>
 {{range .Events}}
 <tr>
 <td>{{relTime .TS}}</td>
-<td><span class="event-pill event-{{.Event}}">{{.Event}}</span></td>
-<td>{{if .Details}}<code>{{.Details}}</code>{{end}}</td>
+<td><span class="tag event-{{.Event}}">{{.Event}}</span></td>
+<td>{{if .Details}}<code class="muted">{{.Details}}</code>{{end}}</td>
 </tr>
 {{end}}
 </tbody>
 </table>
-<p class="muted">Showing up to the last 100 events.</p>
+</div>
+<p class="hint">Showing up to the last 100 events.</p>
 {{else}}
-<p><em>No events yet. Trigger a scan from the subnet page.</em></p>
+<div class="empty">No events yet. Trigger a scan from the subnet page.</div>
 {{end}}
 {{end}}
 {{end}}
