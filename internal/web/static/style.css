@@ -124,7 +124,9 @@ input, select, textarea {
 }
 input[type="checkbox"], input[type="radio"] { width: auto; margin: 0; accent-color: var(--accent); }
 input:focus, select:focus, textarea:focus { outline: 1px solid var(--accent); outline-offset: 0; }
-input::placeholder, textarea::placeholder { color: var(--dim); }
+/* Placeholders carry real hints (the CIDR format, what the bulk value is
+   for), so they get readable contrast, not --dim. */
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: 1; }
 textarea { resize: vertical; }
 
 button, a.btn {
@@ -233,7 +235,7 @@ h2 a { letter-spacing: 0; text-transform: none; }
 
 .muted { color: var(--muted); }
 /* --dim is under 3:1 on a panel: decoration only (empty-value dashes, the
-   unknown-status dot), never text that carries a state or a value. */
+   unknown-status dot), never text that carries a state, a value or a hint. */
 .dim { color: var(--dim); }
 .ok { color: var(--ok); }
 .warn { color: var(--warn); }
