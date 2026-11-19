@@ -162,7 +162,7 @@ func TestIPSortKeyOrdersNumerically(t *testing.T) {
 	}
 	for i := 1; i < len(ordered); i++ {
 		a, b := ipSortKey(ordered[i-1]), ipSortKey(ordered[i])
-		if !(a < b) {
+		if a >= b {
 			t.Errorf("ipSortKey(%q) = %q is not below ipSortKey(%q) = %q", ordered[i-1], a, ordered[i], b)
 		}
 	}

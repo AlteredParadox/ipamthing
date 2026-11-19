@@ -35,6 +35,13 @@
   // The cell deliberately keeps its table-cell role: the text is only cut
   // off visually, so a screen reader already reads all of it in its column,
   // and turning the cell into a button would take that away.
+  //
+  // Controls inside the cell (links, the inline-edit input) keep their own
+  // behaviour, so a click on one of them is not a toggle.
+  function isClipToggle(e, td) {
+    return td.classList.contains('clipped') && !e.target.closest('a, input, button, select, textarea');
+  }
+
   function bindClip() {
     const cells = Array.prototype.slice.call(document.querySelectorAll('td.clip'));
     if (!cells.length) return;
@@ -53,15 +60,9 @@
       if (!td.classList.toggle('expanded')) measure();
     }
 
-    // Controls inside the cell (links, the inline-edit input) keep their
-    // own behaviour.
-    function isToggleTarget(e, td) {
-      return td.classList.contains('clipped') && !e.target.closest('a, input, button, select, textarea');
-    }
-
     cells.forEach(function (td) {
       td.addEventListener('click', function (e) {
-        if (isToggleTarget(e, td)) toggle(td);
+        if (isClipToggle(e, td)) toggle(td);
       });
       td.addEventListener('keydown', function (e) {
         if (e.target !== td || (e.key !== 'Enter' && e.key !== ' ')) return;
@@ -84,7 +85,11 @@
     window.addEventListener('resize', schedule);
     document.addEventListener('click', schedule);
     document.addEventListener('input', schedule);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+    if (document.fonts) {
+      // A font that fails to load changes nothing to measure; the resize
+      // paths below still cover every later layout change.
+      document.fonts.ready.then(measure).catch(function () { /* nothing to re-measure */ });
+    }
     if (typeof ResizeObserver === 'function') {
       const observer = new ResizeObserver(schedule);
       cells.forEach(function (td) { observer.observe(td); });
@@ -99,6 +104,36 @@
   // one (timestamps, IP keys, raw counts) and by its text otherwise. Empty
   // values always sink to the bottom. The choice is remembered per table for
   // the browser session, so saving a row edit doesn't reshuffle the list.
+  //
+  // sortValue reads one cell's sort value: null when empty (or not a number
+  // in a numeric column), so the caller can sink it.
+  function sortValue(tr, col, numeric) {
+    const td = tr.cells[col];
+    if (!td) return null;
+    const raw = (td.dataset.v === undefined ? td.textContent : td.dataset.v).trim();
+    if (raw === '') return null;
+    if (!numeric) return raw;
+    const n = Number.parseFloat(raw);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  function compareExact(a, b) {
+    if (a < b) return -1;
+    return a > b ? 1 : 0;
+  }
+
+  function sortArrow(dir) {
+    return dir > 0 ? '\u2191' : '\u2193';
+  }
+
+  // nextSortDir: an unsorted column starts in its preferred direction
+  // (data-first="desc" for times), a sorted one flips.
+  function nextSortDir(th) {
+    const current = th.getAttribute('aria-sort');
+    if (current === null) return th.dataset.first === 'desc' ? -1 : 1;
+    return current === 'ascending' ? -1 : 1;
+  }
+
   function bindSort() {
     const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
@@ -108,22 +143,12 @@
       if (!body || !heads.length || body.querySelector('td.empty-row')) return;
       const storeKey = 'sort:' + location.pathname + '#' + tableIndex;
 
-      function value(tr, col, numeric) {
-        const td = tr.cells[col];
-        if (!td) return null;
-        const raw = (td.dataset.v === undefined ? td.textContent : td.dataset.v).trim();
-        if (raw === '') return null;
-        if (!numeric) return raw;
-        const n = parseFloat(raw);
-        return isNaN(n) ? null : n;
-      }
-
       function apply(th, dir) {
         const col = th.cellIndex;
         const numeric = th.dataset.sort === 'num';
         const exact = th.dataset.sort === 'key';
         const rows = Array.prototype.map.call(body.rows, function (tr, i) {
-          return { tr: tr, v: value(tr, col, numeric), i: i };
+          return { tr: tr, v: sortValue(tr, col, numeric), i: i };
         });
         rows.sort(function (a, b) {
           if (a.v === null || b.v === null) {
@@ -132,7 +157,7 @@
           }
           let c;
           if (numeric) c = a.v - b.v;
-          else if (exact) c = a.v < b.v ? -1 : (a.v > b.v ? 1 : 0);
+          else if (exact) c = compareExact(a.v, b.v);
           else c = collator.compare(a.v, b.v);
           return c === 0 ? a.i - b.i : c * dir;
         });
@@ -143,7 +168,7 @@
           h.classList.toggle('sorted', on);
           if (on) h.setAttribute('aria-sort', dir > 0 ? 'ascending' : 'descending');
           else h.removeAttribute('aria-sort');
-          h.querySelector('.arrow').textContent = on ? (dir > 0 ? '\u2191' : '\u2193') : '';
+          h.querySelector('.arrow').textContent = on ? sortArrow(dir) : '';
         });
         try { sessionStorage.setItem(storeKey, col + ':' + dir); } catch (e) { /* private mode */ }
       }
@@ -159,10 +184,7 @@
         btn.appendChild(arrow);
         th.appendChild(btn);
         btn.addEventListener('click', function () {
-          const first = th.dataset.first === 'desc' ? -1 : 1;
-          const current = th.getAttribute('aria-sort');
-          const dir = current === null ? first : (current === 'ascending' ? -1 : 1);
-          apply(th, dir);
+          apply(th, nextSortDir(th));
         });
       });
 
@@ -170,7 +192,7 @@
       try { saved = sessionStorage.getItem(storeKey); } catch (e) { /* private mode */ }
       if (saved) {
         const parts = saved.split(':');
-        const th = heads.filter(function (h) { return h.cellIndex === Number(parts[0]); })[0];
+        const th = heads.find(function (h) { return h.cellIndex === Number(parts[0]); });
         if (th) apply(th, parts[1] === '-1' ? -1 : 1);
       }
     });
