@@ -150,6 +150,12 @@ func TestIPSortKeyOrdersNumerically(t *testing.T) {
 		"10.0.1.0/24",
 		"192.168.1.1",
 		"192.168.1.100",
+		"255.255.255.255",
+		// every IPv6 value follows every IPv4 one, including those that are
+		// numerically below the IPv4-mapped range
+		"::/0",
+		"::1",
+		"::ffff:10.0.0.1",
 		"2001:db8::1",
 		"2001:db8::a",
 		"2001:db8::10",
@@ -159,6 +165,9 @@ func TestIPSortKeyOrdersNumerically(t *testing.T) {
 		if !(a < b) {
 			t.Errorf("ipSortKey(%q) = %q is not below ipSortKey(%q) = %q", ordered[i-1], a, ordered[i], b)
 		}
+	}
+	if a, b := ipSortKey("10.0.0.1"), ipSortKey("::ffff:10.0.0.1"); a == b {
+		t.Errorf("10.0.0.1 and its IPv4-mapped IPv6 form share the key %q", a)
 	}
 	if got := ipSortKey("not-an-ip"); got != "not-an-ip" {
 		t.Errorf("unparseable input: got %q, want it unchanged", got)

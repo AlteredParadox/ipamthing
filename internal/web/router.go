@@ -79,16 +79,30 @@ type Server struct {
 
 // ipSortKey turns an address or CIDR into a string whose byte order is its
 // numeric order, so the browser can sort an IP column with a plain string
-// compare (10.0.0.9 before 10.0.0.10, IPv4 before IPv6, a /16 before the /24
-// at the same base). Anything unparseable sorts as itself.
+// compare (10.0.0.9 before 10.0.0.10, a /16 before the /24 at the same
+// base). Anything unparseable sorts as itself.
+//
+// The key leads with the address family. As16 alone is not enough: it puts
+// IPv4 at ::ffff:a.b.c.d, in the middle of IPv6 space, so ::1 would sort
+// before every IPv4 address and ::ffff:10.0.0.1 would collide with 10.0.0.1.
 func ipSortKey(s string) string {
 	if p, err := netip.ParsePrefix(s); err == nil {
-		return fmt.Sprintf("%x/%03d", p.Addr().As16(), p.Bits())
+		return fmt.Sprintf("%s/%03d", addrSortKey(p.Addr()), p.Bits())
 	}
 	if a, err := netip.ParseAddr(s); err == nil {
-		return fmt.Sprintf("%x", a.As16())
+		return addrSortKey(a)
 	}
 	return s
+}
+
+// addrSortKey is "4" or "6" followed by the address as 32 hex digits, so
+// all of IPv4 orders before all of IPv6 (IPv4-mapped IPv6 counts as IPv6).
+func addrSortKey(a netip.Addr) string {
+	family := "6"
+	if a.Is4() {
+		family = "4"
+	}
+	return fmt.Sprintf("%s%x", family, a.As16())
 }
 
 var funcMap = template.FuncMap{

@@ -23,6 +23,59 @@
     bindConfirms();
     bindRowEdit();
     bindSort();
+    bindClip();
+  }
+
+  // A td.clip cell cuts long text off with an ellipsis. The full text is in
+  // its title, but a tooltip needs a mouse, so any cell that is actually
+  // truncated becomes a keyboard- and touch-operable toggle: click, Enter or
+  // Space expands it to wrap in place, and again collapses it. Cells that
+  // fit are left alone, so they add no tab stops.
+  //
+  // The cell deliberately keeps its table-cell role: the text is only cut
+  // off visually, so a screen reader already reads all of it in its column,
+  // and turning the cell into a button would take that away.
+  function bindClip() {
+    const cells = Array.prototype.slice.call(document.querySelectorAll('td.clip'));
+    if (!cells.length) return;
+
+    function measure() {
+      cells.forEach(function (td) {
+        if (td.classList.contains('expanded')) return;
+        const cut = td.scrollWidth > td.clientWidth;
+        td.classList.toggle('clipped', cut);
+        if (cut) td.tabIndex = 0;
+        else td.removeAttribute('tabindex');
+      });
+    }
+
+    function toggle(td) {
+      if (!td.classList.toggle('expanded')) measure();
+    }
+
+    // Controls inside the cell (links, the inline-edit input) keep their
+    // own behaviour.
+    function isToggleTarget(e, td) {
+      return td.classList.contains('clipped') && !e.target.closest('a, input, button, select, textarea');
+    }
+
+    cells.forEach(function (td) {
+      td.addEventListener('click', function (e) {
+        if (isToggleTarget(e, td)) toggle(td);
+      });
+      td.addEventListener('keydown', function (e) {
+        if (e.target !== td || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        toggle(td);
+      });
+    });
+
+    let timer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(timer);
+      timer = setTimeout(measure, 150);
+    });
+    measure();
   }
 
   // Click-to-sort for every table whose header cells carry data-sort:

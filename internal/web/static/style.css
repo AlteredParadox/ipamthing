@@ -262,6 +262,12 @@ td.clip { max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
 /* The one free-text column per table takes whatever width is left over and
    clips to it; the min-width keeps it usable when the wrapper scrolls. */
 td.clip.grow { width: 100%; max-width: 0; min-width: 140px; }
+/* app.js marks a cell .clipped when its text really is cut off and makes it
+   a toggle; .expanded wraps the full text in place, so reading it never
+   depends on a hover tooltip. */
+td.clip.clipped { cursor: pointer; }
+td.clip.clipped:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+td.clip.expanded { padding-top: 6px; padding-bottom: 6px; white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 table:has(td.grow) { min-width: 760px; }
 .hosts-table:has(td.grow) { min-width: 1000px; }
 td.col-muted { color: var(--muted); }
